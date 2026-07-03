@@ -1,0 +1,51 @@
+name: omnia_wallet
+description: "Omnia Protocol mobile wallet — self-custodial UBC wallet."
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Networking
+  dio: ^5.7.0
+
+  # Cryptography — Ed25519 keygen/sign (interops with the node's ed25519-dalek)
+  ed25519_edwards: ^0.3.1
+  # BIP39 mnemonic backup/recovery (seed -> Ed25519 key)
+  bip39: ^1.0.6
+  # SHA-256 for deterministic DID derivation (must match the node's rule)
+  crypto: ^3.0.3
+  convert: ^3.1.1
+
+  # Secure key storage (Keychain / Keystore)
+  flutter_secure_storage: ^9.2.2
+  # Biometric / device-credential gate before signing
+  local_auth: ^2.3.0
+
+  # QR: show own DID, scan recipient DID
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.2.3
+
+  # Navigation
+  go_router: ^14.2.7
+
+  # Formatting
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
