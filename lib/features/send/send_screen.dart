@@ -6,6 +6,7 @@ import 'package:local_auth/local_auth.dart';
 
 import '../../core/format.dart';
 import '../../state/providers.dart';
+import 'scan_did_screen.dart';
 
 class SendScreen extends ConsumerStatefulWidget {
   const SendScreen({super.key});
@@ -34,6 +35,15 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       return 'DID must start with did:omnia:';
     }
     return null;
+  }
+
+  Future<void> _scanDid() async {
+    final did = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const ScanDidScreen()),
+    );
+    if (did != null) {
+      _toDidController.text = did;
+    }
   }
 
   String? _validateAmount(String? v) {
@@ -115,14 +125,25 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                 decoration: InputDecoration(
                   labelText: 'Recipient DID',
                   hintText: 'did:omnia:…',
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.paste),
-                    onPressed: () async {
-                      final data = await Clipboard.getData('text/plain');
-                      if (data?.text != null) {
-                        _toDidController.text = data!.text!.trim();
-                      }
-                    },
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Scan QR',
+                        icon: const Icon(Icons.qr_code_scanner),
+                        onPressed: _scanDid,
+                      ),
+                      IconButton(
+                        tooltip: 'Paste',
+                        icon: const Icon(Icons.paste),
+                        onPressed: () async {
+                          final data = await Clipboard.getData('text/plain');
+                          if (data?.text != null) {
+                            _toDidController.text = data!.text!.trim();
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
