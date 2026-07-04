@@ -19,8 +19,11 @@ pluginManagement {
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
-    id("com.android.application") version "9.0.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.3.20" apply false
+    // Pinned to the stable Android Gradle Plugin / Kotlin line. AGP 9.x is
+    // still experimental and its DSL breaks on many machines; 8.7.x is the
+    // broadly-compatible release for current Flutter stable.
+    id("com.android.application") version "8.7.3" apply false
+    id("org.jetbrains.kotlin.android") version "2.1.10" apply false
 }
 
 include(":app")
