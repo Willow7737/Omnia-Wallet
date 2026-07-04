@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../core/format.dart';
+import '../../core/haptics.dart';
 import '../../state/providers.dart';
+import 'scan_did_screen.dart';
 
 class SendScreen extends ConsumerStatefulWidget {
   const SendScreen({super.key});
@@ -36,6 +38,17 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     return null;
   }
 
+  Future<void> _scanDid() async {
+    Haptics.medium();
+    final did = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const ScanDidScreen()),
+    );
+    if (did != null) {
+      Haptics.selection();
+      _toDidController.text = did;
+    }
+  }
+
   String? _validateAmount(String? v) {
     final value = (v ?? '').trim();
     final n = int.tryParse(value);
@@ -63,6 +76,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     final toDid = _toDidController.text.trim();
     final amount = int.parse(_amountController.text.trim());
 
+    Haptics.medium();
     final proceed = await showDialog<bool>(
       context: context,
       builder: (_) => _ConfirmSheet(toDid: toDid, amount: amount),
@@ -79,14 +93,18 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       ref.invalidate(balanceProvider);
       ref.invalidate(historyProvider);
       if (!mounted) return;
+      Haptics.success();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                'Sent ${Fmt.ubc(result.amount)} · new balance ${Fmt.ubc(result.newBalance)}')),
+          content: Text(
+            'Sent ${Fmt.ubc(result.amount)} · new balance ${Fmt.ubc(result.newBalance)}',
+          ),
+        ),
       );
       context.pop();
     } catch (e) {
       if (mounted) {
+        Haptics.error();
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Send failed: $e')));
       }
@@ -115,14 +133,25 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                 decoration: InputDecoration(
                   labelText: 'Recipient DID',
                   hintText: 'did:omnia:…',
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.paste),
-                    onPressed: () async {
-                      final data = await Clipboard.getData('text/plain');
-                      if (data?.text != null) {
-                        _toDidController.text = data!.text!.trim();
-                      }
-                    },
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        tooltip: 'Scan QR',
+                        icon: const Icon(Icons.qr_code_scanner),
+                        onPressed: _scanDid,
+                      ),
+                      IconButton(
+                        tooltip: 'Paste',
+                        icon: const Icon(Icons.paste),
+                        onPressed: () async {
+                          final data = await Clipboard.getData('text/plain');
+                          if (data?.text != null) {
+                            _toDidController.text = data!.text!.trim();
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),

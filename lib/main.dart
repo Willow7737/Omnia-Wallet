@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/config.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
+import 'features/lock/app_lock_gate.dart';
 import 'state/providers.dart';
 
 Future<void> main() async {
@@ -40,6 +41,8 @@ class _OmniaWalletAppState extends ConsumerState<OmniaWalletApp> {
       theme: OmniaTheme.light(),
       darkTheme: OmniaTheme.dark(),
       routerConfig: router,
+      builder: (context, child) =>
+          AppLockGate(child: child ?? const SizedBox.shrink()),
     );
   }
 }

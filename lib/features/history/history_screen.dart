@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/widgets/fade_slide_in.dart';
 import '../../state/providers.dart';
 import '../home/home_screen.dart' show TransferTile;
 
@@ -44,7 +45,10 @@ class HistoryScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               itemCount: ordered.length,
               separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (_, i) => TransferTile(record: ordered[i]),
+              itemBuilder: (_, i) => FadeSlideIn(
+                delay: Duration(milliseconds: 30 * (i.clamp(0, 8))),
+                child: TransferTile(record: ordered[i]),
+              ),
             );
           },
         ),

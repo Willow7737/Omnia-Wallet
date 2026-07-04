@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/haptics.dart';
+import '../../core/widgets/fade_slide_in.dart';
 import '../../state/providers.dart';
 
 /// First-run: create a new wallet (showing the recovery phrase) or import one.
@@ -17,6 +19,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   bool _busy = false;
 
   Future<void> _create() async {
+    Haptics.medium();
     setState(() => _busy = true);
     try {
       final mnemonic = await ref.read(authRepositoryProvider).createWallet();
@@ -33,6 +36,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _import() async {
+    Haptics.light();
     final phrase = await showDialog<String>(
       context: context,
       builder: (_) => const _ImportDialog(),
@@ -69,7 +73,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Spacer(),
-              Text('omnia', style: theme.textTheme.displaySmall),
+              FadeSlideIn(
+                child: Text('omnia', style: theme.textTheme.displaySmall),
+              ),
               const SizedBox(height: 8),
               Text(
                 'A self-custodial wallet for Universal Basic Compute.',

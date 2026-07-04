@@ -47,9 +47,16 @@ class SecureStore {
   Future<void> saveNodeUrl(String url) async =>
       _storage.write(key: AppConfig.kNodeUrlKey, value: url);
 
+  Future<bool> isAppLockEnabled() async =>
+      (await _storage.read(key: AppConfig.kAppLockKey)) == 'true';
+
+  Future<void> setAppLockEnabled(bool enabled) async =>
+      _storage.write(key: AppConfig.kAppLockKey, value: enabled.toString());
+
   /// Irreversibly wipe all wallet material from the device.
   Future<void> wipe() async {
     await _storage.delete(key: AppConfig.kSeedKey);
     await _storage.delete(key: AppConfig.kMnemonicKey);
+    await _storage.delete(key: AppConfig.kAppLockKey);
   }
 }
