@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/haptics.dart';
+import '../lock/app_lock.dart';
 import '../../state/providers.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -28,6 +30,7 @@ class SettingsScreen extends ConsumerWidget {
               onTap: identity == null
                   ? null
                   : () {
+                      Haptics.selection();
                       Clipboard.setData(ClipboardData(text: identity.did));
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('DID copied')),
@@ -45,6 +48,13 @@ class SettingsScreen extends ConsumerWidget {
           ),
           const Divider(),
           const _SectionHeader('Security'),
+          SwitchListTile(
+            secondary: const Icon(Icons.fingerprint),
+            title: const Text('App lock'),
+            subtitle: const Text('Require biometrics to open the wallet'),
+            value: ref.watch(appLockProvider.select((s) => s.enabled)),
+            onChanged: (v) => _toggleAppLock(context, ref, v),
+          ),
           ListTile(
             leading: const Icon(Icons.key_outlined),
             title: const Text('Reveal recovery phrase'),
@@ -60,6 +70,27 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _toggleAppLock(
+      BuildContext context, WidgetRef ref, bool enable) async {
+    final result = await ref.read(appLockProvider.notifier).setEnabled(enable);
+    if (!context.mounted) return;
+    switch (result) {
+      case UnlockResult.success:
+        Haptics.selection();
+      case UnlockResult.failed:
+        Haptics.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Authentication failed')),
+        );
+      case UnlockResult.unavailable:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Biometrics are not available on this device'),
+          ),
+        );
+    }
   }
 
   Future<void> _editNodeUrl(

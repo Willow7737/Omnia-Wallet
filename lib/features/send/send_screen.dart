@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../core/format.dart';
+import '../../core/haptics.dart';
 import '../../state/providers.dart';
 import 'scan_did_screen.dart';
 
@@ -38,10 +39,12 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   }
 
   Future<void> _scanDid() async {
+    Haptics.medium();
     final did = await Navigator.of(context).push<String>(
       MaterialPageRoute(builder: (_) => const ScanDidScreen()),
     );
     if (did != null) {
+      Haptics.selection();
       _toDidController.text = did;
     }
   }
@@ -73,6 +76,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     final toDid = _toDidController.text.trim();
     final amount = int.parse(_amountController.text.trim());
 
+    Haptics.medium();
     final proceed = await showDialog<bool>(
       context: context,
       builder: (_) => _ConfirmSheet(toDid: toDid, amount: amount),
@@ -89,14 +93,18 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       ref.invalidate(balanceProvider);
       ref.invalidate(historyProvider);
       if (!mounted) return;
+      Haptics.success();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text(
-                'Sent ${Fmt.ubc(result.amount)} · new balance ${Fmt.ubc(result.newBalance)}')),
+          content: Text(
+            'Sent ${Fmt.ubc(result.amount)} · new balance ${Fmt.ubc(result.newBalance)}',
+          ),
+        ),
       );
       context.pop();
     } catch (e) {
       if (mounted) {
+        Haptics.error();
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('Send failed: $e')));
       }
