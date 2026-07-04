@@ -3,6 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
+import '../../core/haptics.dart';
+import '../../core/motion.dart';
+import '../../core/theme.dart';
+import '../../core/widgets/animated_count.dart';
+import '../../core/widgets/fade_slide_in.dart';
+import '../../core/widgets/shimmer.dart';
 import '../../data/models.dart';
 import '../../state/providers.dart';
 
@@ -20,12 +26,16 @@ class HomeScreen extends ConsumerWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
-            onPressed: () => context.push('/settings'),
+            onPressed: () {
+              Haptics.light();
+              context.push('/settings');
+            },
           ),
         ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
+          Haptics.light();
           ref.invalidate(balanceProvider);
           ref.invalidate(historyProvider);
           await ref.read(balanceProvider.future);
@@ -33,26 +43,29 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            _BalanceCard(balanceAsync: balanceAsync),
+            FadeSlideIn(child: _BalanceCard(balanceAsync: balanceAsync)),
             const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _ActionButton(
-                    icon: Icons.arrow_upward,
-                    label: 'Send',
-                    onTap: () => context.push('/send'),
+            FadeSlideIn(
+              delay: Motion.micro,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.arrow_upward,
+                      label: 'Send',
+                      onTap: () => context.push('/send'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _ActionButton(
-                    icon: Icons.qr_code,
-                    label: 'Receive',
-                    onTap: () => context.push('/receive'),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ActionButton(
+                      icon: Icons.qr_code,
+                      label: 'Receive',
+                      onTap: () => context.push('/receive'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 28),
             Row(
@@ -60,7 +73,10 @@ class HomeScreen extends ConsumerWidget {
               children: [
                 Text('Recent activity', style: theme.textTheme.titleMedium),
                 TextButton(
-                  onPressed: () => context.push('/history'),
+                  onPressed: () {
+                    Haptics.light();
+                    context.push('/history');
+                  },
                   child: const Text('See all'),
                 ),
               ],
@@ -85,34 +101,47 @@ class _BalanceCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: balanceAsync.when(
-          loading: () => const SizedBox(
-            height: 96,
-            child: Center(child: CircularProgressIndicator()),
+          loading: () => const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ShimmerBox(width: 80, height: 14),
+              SizedBox(height: 14),
+              ShimmerBox(width: 200, height: 40, radius: 10),
+              SizedBox(height: 18),
+              ShimmerBox(width: 150, height: 14),
+            ],
           ),
           error: (e, _) => SizedBox(
             height: 96,
             child: Center(
-              child: Text('Could not load balance:\n$e',
-                  textAlign: TextAlign.center),
+              child: Text(
+                'Could not load balance:\n$e',
+                textAlign: TextAlign.center,
+              ),
             ),
           ),
           data: (b) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Balance',
-                  style: theme.textTheme.labelLarge
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              Text(
+                'Balance',
+                style: theme.textTheme.labelLarge
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
               const SizedBox(height: 6),
-              Text(Fmt.ubc(b.balance),
-                  style: theme.textTheme.displaySmall
-                      ?.copyWith(fontWeight: FontWeight.w600)),
+              AnimatedCount(
+                value: b.balance,
+                format: Fmt.ubc,
+                style: theme.textTheme.displaySmall,
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 16,
                 children: [
                   _Meta(
-                      label: 'Monthly quota',
-                      value: Fmt.number(b.monthlyQuota)),
+                    label: 'Monthly quota',
+                    value: Fmt.number(b.monthlyQuota),
+                  ),
                   _Meta(label: 'Epoch', value: '#${b.currentEpoch}'),
                 ],
               ),
@@ -135,9 +164,11 @@ class _Meta extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+        Text(
+          label,
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
         Text(value, style: theme.textTheme.titleSmall),
       ],
     );
@@ -158,7 +189,10 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FilledButton.tonalIcon(
-      onPressed: onTap,
+      onPressed: () {
+        Haptics.light();
+        onTap();
+      },
       icon: Icon(icon),
       label: Text(label),
       style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
@@ -172,8 +206,16 @@ class _RecentActivity extends ConsumerWidget {
     final historyAsync = ref.watch(historyProvider);
     return historyAsync.when(
       loading: () => const Padding(
-        padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          children: [
+            _ActivitySkeleton(),
+            SizedBox(height: 12),
+            _ActivitySkeleton(),
+            SizedBox(height: 12),
+            _ActivitySkeleton(),
+          ],
+        ),
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(12),
@@ -188,9 +230,37 @@ class _RecentActivity extends ConsumerWidget {
         }
         final recent = records.reversed.take(5).toList();
         return Column(
-          children: [for (final r in recent) TransferTile(record: r)],
+          children: [
+            for (var i = 0; i < recent.length; i++)
+              FadeSlideIn(
+                delay: Duration(milliseconds: 40 * i),
+                child: TransferTile(record: recent[i]),
+              ),
+          ],
         );
       },
+    );
+  }
+}
+
+class _ActivitySkeleton extends StatelessWidget {
+  const _ActivitySkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      children: [
+        ShimmerBox(width: 40, height: 40, radius: 20),
+        SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ShimmerBox(width: 140, height: 14),
+            SizedBox(height: 8),
+            ShimmerBox(width: 90, height: 12),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -201,15 +271,19 @@ class TransferTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final negative = context.omnia.negative;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: const CircleAvatar(child: Icon(Icons.arrow_upward)),
       title: Text('Sent ${Fmt.ubc(record.amount)}'),
       subtitle: Text(
-          'To ${Fmt.shortDid(record.toDid)}\n${Fmt.dateTime(record.dateTime)}'),
+        'To ${Fmt.shortDid(record.toDid)}\n${Fmt.dateTime(record.dateTime)}',
+      ),
       isThreeLine: true,
-      trailing: Text('−${record.amount}',
-          style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: Text(
+        '−${record.amount}',
+        style: TextStyle(fontWeight: FontWeight.w700, color: negative),
+      ),
     );
   }
 }

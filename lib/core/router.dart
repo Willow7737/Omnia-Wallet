@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -8,6 +9,14 @@ import '../features/receive/receive_screen.dart';
 import '../features/send/send_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../state/providers.dart';
+import 'motion.dart';
+
+/// Wrap a screen in the shared fade-through transition.
+Page<void> _page(GoRouterState state, Widget child) => fadeThroughPage<void>(
+      key: state.pageKey,
+      name: state.name ?? state.matchedLocation,
+      child: child,
+    );
 
 /// Builds the app router. Redirects to onboarding until a wallet exists.
 GoRouter buildRouter(WidgetRef ref) {
@@ -22,13 +31,30 @@ GoRouter buildRouter(WidgetRef ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
       GoRoute(
-          path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
-      GoRoute(path: '/send', builder: (_, __) => const SendScreen()),
-      GoRoute(path: '/receive', builder: (_, __) => const ReceiveScreen()),
-      GoRoute(path: '/history', builder: (_, __) => const HistoryScreen()),
-      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+        path: '/',
+        pageBuilder: (_, s) => _page(s, const HomeScreen()),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        pageBuilder: (_, s) => _page(s, const OnboardingScreen()),
+      ),
+      GoRoute(
+        path: '/send',
+        pageBuilder: (_, s) => _page(s, const SendScreen()),
+      ),
+      GoRoute(
+        path: '/receive',
+        pageBuilder: (_, s) => _page(s, const ReceiveScreen()),
+      ),
+      GoRoute(
+        path: '/history',
+        pageBuilder: (_, s) => _page(s, const HistoryScreen()),
+      ),
+      GoRoute(
+        path: '/settings',
+        pageBuilder: (_, s) => _page(s, const SettingsScreen()),
+      ),
     ],
   );
 }

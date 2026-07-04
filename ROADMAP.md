@@ -15,11 +15,11 @@ Legend: ✅ done · 🔜 next · ⬜ planned.
 - ✅ Receive: own DID as QR
 - ✅ Settings: node endpoint, reveal recovery phrase, wipe wallet
 - ✅ **Scan recipient DID via QR** (Send screen)
+- ✅ **App-launch biometric lock** (auto-lock on background; Settings toggle)
+- ✅ **Motion & haptics system**: shared transitions, press feedback, animated balance, shimmer loading, staggered lists, semantic haptics
 - ✅ CI: format + analyze + test
 
 ## Phase 2 — Security & polish
-
-- 🔜 **App-launch lock**: biometric / device-credential gate when opening the app (auto-lock after background/timeout)
 - ⬜ **Address book**: save & label frequently-used recipient DIDs
 - ⬜ **Amount UX**: max button, balance-aware validation, confirmation of remaining balance
 - ⬜ **Copy/share polish**: share DID sheet, richer QR (with label), pull-to-refresh everywhere

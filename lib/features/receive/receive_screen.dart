@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
+import '../../core/haptics.dart';
+import '../../core/widgets/fade_slide_in.dart';
 import '../../crypto/key_manager.dart';
 import '../../state/providers.dart';
 
@@ -27,7 +29,9 @@ class ReceiveScreen extends ConsumerWidget {
             if (identity == null) {
               return const Text('No wallet found');
             }
-            return _DidView(identity: identity, theme: theme);
+            return FadeSlideIn(
+              child: _DidView(identity: identity, theme: theme),
+            );
           },
         ),
       ),
@@ -69,6 +73,7 @@ class _DidView extends StatelessWidget {
           const SizedBox(height: 16),
           FilledButton.tonalIcon(
             onPressed: () {
+              Haptics.selection();
               Clipboard.setData(ClipboardData(text: identity.did));
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('DID copied')),
