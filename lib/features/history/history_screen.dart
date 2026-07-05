@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/errors.dart';
 import '../../core/widgets/fade_slide_in.dart';
 import '../../state/providers.dart';
 import '../home/home_screen.dart' show TransferTile;
@@ -25,7 +26,7 @@ class HistoryScreen extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.all(24),
-                child: Center(child: Text('Could not load history:\n$e')),
+                child: Center(child: Text(friendlyError(e).message)),
               ),
             ],
           ),
