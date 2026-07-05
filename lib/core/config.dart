@@ -25,6 +25,7 @@ class AppConfig {
   static const String kMnemonicKey = 'omnia.wallet.mnemonic';
   static const String kNodeUrlKey = 'omnia.wallet.node_url';
   static const String kAppLockKey = 'omnia.wallet.app_lock';
+  static const String kContactsKey = 'omnia.wallet.contacts';
 
   /// Refresh the JWT this many seconds before it actually expires.
   static const int jwtRefreshSkewSecs = 60;

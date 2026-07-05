@@ -39,6 +39,15 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           const Divider(),
+          const _SectionHeader('General'),
+          ListTile(
+            leading: const Icon(Icons.contacts_outlined),
+            title: const Text('Address book'),
+            subtitle: const Text('Saved recipient DIDs'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/contacts'),
+          ),
+          const Divider(),
           const _SectionHeader('Node'),
           ListTile(
             title: const Text('Node endpoint'),
