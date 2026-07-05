@@ -25,6 +25,12 @@ class ApiClient {
 
   set baseUrl(String url) => _dio.options.baseUrl = _normalize(url);
 
+  /// `GET /api/v1/node/info` — public, no auth. Node health/version/peers.
+  Future<NodeInfo> getNodeInfo() async {
+    final res = await _dio.get<Map<String, dynamic>>('/api/v1/node/info');
+    return NodeInfo.fromJson(res.data!);
+  }
+
   Options _auth(String token) =>
       Options(headers: {'authorization': 'Bearer $token'});
 

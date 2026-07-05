@@ -84,6 +84,34 @@ class TransferRecord {
       );
 }
 
+/// Public node status from `GET /api/v1/node/info`.
+class NodeInfo {
+  NodeInfo({
+    required this.version,
+    required this.protocolVersion,
+    required this.uptimeSeconds,
+    required this.peers,
+    required this.finalizedHeight,
+    required this.shardCount,
+  });
+
+  final String version;
+  final String protocolVersion;
+  final int uptimeSeconds;
+  final int peers;
+  final int finalizedHeight;
+  final int shardCount;
+
+  factory NodeInfo.fromJson(Map<String, dynamic> json) => NodeInfo(
+        version: json['version'] as String? ?? '—',
+        protocolVersion: json['protocol_version']?.toString() ?? '—',
+        uptimeSeconds: (json['uptime_seconds'] as num?)?.toInt() ?? 0,
+        peers: (json['peers'] as num?)?.toInt() ?? 0,
+        finalizedHeight: (json['finalized_height'] as num?)?.toInt() ?? 0,
+        shardCount: (json['shard_count'] as num?)?.toInt() ?? 0,
+      );
+}
+
 /// Session credentials returned by `POST /api/v1/auth/login`.
 class Session {
   Session({required this.did, required this.token, required this.expiresAt});
