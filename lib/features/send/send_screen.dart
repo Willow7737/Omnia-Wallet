@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
+import '../../state/contacts.dart';
 import '../../state/providers.dart';
+import '../contacts/contacts_screen.dart';
 import 'scan_did_screen.dart';
 
 class SendScreen extends ConsumerStatefulWidget {
@@ -21,6 +24,10 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   final _toDidController = TextEditingController();
   final _amountController = TextEditingController();
   bool _busy = false;
+
+  /// Latest known spendable balance (from balanceProvider), for validation
+  /// and the "remaining after send" hint.
+  int? _available;
 
   @override
   void dispose() {
@@ -38,6 +45,14 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     return null;
   }
 
+  String? _validateAmount(String? v) {
+    final n = int.tryParse((v ?? '').trim());
+    if (n == null || n <= 0) return 'Enter a positive whole number';
+    final bal = _available;
+    if (bal != null && n > bal) return 'You only have ${Fmt.ubc(bal)}';
+    return null;
+  }
+
   Future<void> _scanDid() async {
     Haptics.medium();
     final did = await Navigator.of(context).push<String>(
@@ -49,11 +64,28 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     }
   }
 
-  String? _validateAmount(String? v) {
-    final value = (v ?? '').trim();
-    final n = int.tryParse(value);
-    if (n == null || n <= 0) return 'Enter a positive whole number';
-    return null;
+  Future<void> _pickContact() async {
+    Haptics.light();
+    final did = await showContactPicker(context, ref);
+    if (did != null) {
+      Haptics.selection();
+      _toDidController.text = did;
+    }
+  }
+
+  Future<void> _paste() async {
+    final data = await Clipboard.getData('text/plain');
+    if (data?.text != null) {
+      _toDidController.text = data!.text!.trim();
+    }
+  }
+
+  void _setMax() {
+    final bal = _available;
+    if (bal != null && bal > 0) {
+      Haptics.selection();
+      _amountController.text = bal.toString();
+    }
   }
 
   Future<bool> _confirmWithBiometrics() async {
@@ -105,8 +137,9 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     } catch (e) {
       if (mounted) {
         Haptics.error();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Send failed: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e).message)),
+        );
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -116,6 +149,10 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Keep the latest balance for validation / hints.
+    _available = ref.watch(balanceProvider).valueOrNull?.balance;
+    final contacts = ref.watch(contactsProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Send UBC')),
       body: SingleChildScrollView(
@@ -137,6 +174,11 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
+                        tooltip: 'Contacts',
+                        icon: const Icon(Icons.contacts_outlined),
+                        onPressed: _pickContact,
+                      ),
+                      IconButton(
                         tooltip: 'Scan QR',
                         icon: const Icon(Icons.qr_code_scanner),
                         onPressed: _scanDid,
@@ -144,41 +186,74 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                       IconButton(
                         tooltip: 'Paste',
                         icon: const Icon(Icons.paste),
-                        onPressed: () async {
-                          final data = await Clipboard.getData('text/plain');
-                          if (data?.text != null) {
-                            _toDidController.text = data!.text!.trim();
-                          }
-                        },
+                        onPressed: _paste,
                       ),
                     ],
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              // Offer to save a freshly-entered DID that isn't a contact yet.
+              AnimatedBuilder(
+                animation: _toDidController,
+                builder: (context, _) {
+                  final did = _toDidController.text.trim();
+                  final known =
+                      ref.read(contactsProvider.notifier).byDid(did) != null;
+                  if (!did.startsWith('did:omnia:') || known) {
+                    return const SizedBox.shrink();
+                  }
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () =>
+                          editContact(context, ref, presetDid: did),
+                      icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                      label: const Text('Save to contacts'),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
               TextFormField(
                 controller: _amountController,
                 validator: _validateAmount,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
                   labelText: 'Amount',
                   suffixText: 'UBC',
+                  helperText: _available == null
+                      ? null
+                      : 'Available: ${Fmt.ubc(_available!)}',
+                  suffix: TextButton(
+                    onPressed: _available == null ? null : _setMax,
+                    child: const Text('Max'),
+                  ),
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 8),
+              _RemainingHint(
+                amountController: _amountController,
+                available: _available,
+              ),
+              const SizedBox(height: 20),
               FilledButton(
                 onPressed: _busy ? null : _submit,
                 child: _busy
                     ? const SizedBox(
                         height: 20,
                         width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2))
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
                     : const Text('Review & send'),
               ),
               const SizedBox(height: 12),
               Text(
-                'Signed on-device with your private key.',
+                contacts.isEmpty
+                    ? 'Signed on-device with your private key.'
+                    : 'Signed on-device with your private key. '
+                        'Tap the contacts icon to reuse a saved DID.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -187,6 +262,43 @@ class _SendScreenState extends ConsumerState<SendScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Shows "Remaining after send" as the amount changes.
+class _RemainingHint extends StatelessWidget {
+  const _RemainingHint(
+      {required this.amountController, required this.available});
+
+  final TextEditingController amountController;
+  final int? available;
+
+  @override
+  Widget build(BuildContext context) {
+    if (available == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return AnimatedBuilder(
+      animation: amountController,
+      builder: (context, _) {
+        final amount = int.tryParse(amountController.text.trim()) ?? 0;
+        if (amount <= 0) return const SizedBox.shrink();
+        final remaining = available! - amount;
+        final over = remaining < 0;
+        return Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            over
+                ? 'Exceeds your balance by ${Fmt.ubc(-remaining)}'
+                : 'Remaining after send: ${Fmt.ubc(remaining)}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: over
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/contacts/contacts_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
@@ -54,6 +55,10 @@ GoRouter buildRouter(WidgetRef ref) {
       GoRoute(
         path: '/settings',
         pageBuilder: (_, s) => _page(s, const SettingsScreen()),
+      ),
+      GoRoute(
+        path: '/contacts',
+        pageBuilder: (_, s) => _page(s, const ContactsScreen()),
       ),
     ],
   );
