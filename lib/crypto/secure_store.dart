@@ -59,11 +59,18 @@ class SecureStore {
   Future<void> saveContacts(String json) async =>
       _storage.write(key: AppConfig.kContactsKey, value: json);
 
+  Future<String?> readDisplayName() async =>
+      _storage.read(key: AppConfig.kDisplayNameKey);
+
+  Future<void> saveDisplayName(String name) async =>
+      _storage.write(key: AppConfig.kDisplayNameKey, value: name);
+
   /// Irreversibly wipe all wallet material from the device.
   Future<void> wipe() async {
     await _storage.delete(key: AppConfig.kSeedKey);
     await _storage.delete(key: AppConfig.kMnemonicKey);
     await _storage.delete(key: AppConfig.kAppLockKey);
     await _storage.delete(key: AppConfig.kContactsKey);
+    await _storage.delete(key: AppConfig.kDisplayNameKey);
   }
 }

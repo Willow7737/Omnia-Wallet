@@ -7,6 +7,7 @@ import '../features/governance/governance_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
+import '../features/profile/profile_screen.dart';
 import '../features/receive/receive_screen.dart';
 import '../features/send/send_screen.dart';
 import '../features/settings/settings_screen.dart';
@@ -64,6 +65,10 @@ GoRouter buildRouter(WidgetRef ref) {
       GoRoute(
         path: '/governance',
         pageBuilder: (_, s) => _page(s, const GovernanceScreen()),
+      ),
+      GoRoute(
+        path: '/profile',
+        pageBuilder: (_, s) => _page(s, const ProfileScreen()),
       ),
     ],
   );

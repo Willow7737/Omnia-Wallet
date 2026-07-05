@@ -1,0 +1,6 @@
+<svg width="120" height="150" viewBox="0 0 120 150" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Omnia bracket-"O" mark. Single even-odd path so it tints cleanly via a
+       colorFilter (fill is overridden by the app). -->
+  <path fill-rule="evenodd" clip-rule="evenodd" fill="#0A0A0A"
+    d="M28 8h64c11.046 0 20 8.954 20 20v94c0 11.046-8.954 20-20 20H28c-11.046 0-20-8.954-20-20V28C8 16.954 16.954 8 28 8zm14 28c-4.418 0-8 3.582-8 8v62c0 4.418 3.582 8 8 8h36c4.418 0 8-3.582 8-8V44c0-4.418-3.582-8-8-8H42z"/>
+</svg>
