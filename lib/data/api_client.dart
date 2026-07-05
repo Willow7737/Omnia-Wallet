@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import 'governance.dart';
 import 'models.dart';
 
 /// Low-level HTTP client for the Omnia node REST API (`/api/v1/...`).
@@ -58,12 +59,30 @@ class ApiClient {
   // ---- Economics (JWT) ----
 
   /// `GET /api/v1/economics/balance/:did`.
+  ///
+  /// A brand-new DID that has never transacted isn't registered in the node's
+  /// quota system yet, so the node answers 404. That's an expected "empty
+  /// wallet" state, not an error — surface it as a zero, unregistered balance
+  /// so the UI shows "0 UBC · not registered yet" instead of an exception.
   Future<Balance> getBalance(String did, String token) async {
-    final res = await _dio.get<Map<String, dynamic>>(
-      '/api/v1/economics/balance/$did',
-      options: _auth(token),
-    );
-    return Balance.fromJson(res.data!);
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/economics/balance/$did',
+        options: _auth(token),
+      );
+      return Balance.fromJson(res.data!);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return Balance(
+          did: did,
+          balance: 0,
+          monthlyQuota: 0,
+          currentEpoch: 0,
+          isRegistered: false,
+        );
+      }
+      rethrow;
+    }
   }
 
   /// `POST /api/v1/economics/transfer` — spends (burns) UBC. Soulbound.
@@ -94,6 +113,54 @@ class ApiClient {
         .map(TransferRecord.fromJson)
         .toList();
     return list;
+  }
+
+  // ---- Governance (JWT) ----
+
+  /// `GET /api/v1/governance/proposals`.
+  Future<List<Proposal>> listProposals(String token) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/api/v1/governance/proposals',
+      options: _auth(token),
+    );
+    return (res.data?['proposals'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Proposal.fromJson)
+        .toList();
+  }
+
+  /// `POST /api/v1/governance/vote`.
+  Future<CastVoteResult> castVote({
+    required String did,
+    required String proposalId,
+    required VoteChoice choice,
+    required String token,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/governance/vote',
+      data: {'did': did, 'proposal_id': proposalId, 'choice': choice.wire},
+      options: _auth(token),
+    );
+    return CastVoteResult.fromJson(res.data!);
+  }
+
+  /// `POST /api/v1/governance/proposals`.
+  Future<CreateProposalResult> createProposal({
+    required String id,
+    required String description,
+    required int expiresAtEpoch,
+    required String token,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/governance/proposals',
+      data: {
+        'id': id,
+        'description': description,
+        'expires_at_epoch': expiresAtEpoch,
+      },
+      options: _auth(token),
+    );
+    return CreateProposalResult.fromJson(res.data!);
   }
 }
 

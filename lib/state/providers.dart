@@ -46,6 +46,11 @@ final identityProvider = FutureProvider<WalletIdentity?>((ref) async {
   return ref.watch(authRepositoryProvider).loadIdentity();
 });
 
+/// User-chosen display name (local only), or null if unset.
+final displayNameProvider = FutureProvider<String?>((ref) async {
+  return ref.watch(secureStoreProvider).readDisplayName();
+});
+
 /// Current balance. Auto-refreshes when invalidated after a send.
 final balanceProvider = FutureProvider<Balance>((ref) async {
   return ref.watch(walletRepositoryProvider).balance();
