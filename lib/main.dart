@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'core/config.dart';
 import 'core/router.dart';
@@ -20,6 +21,17 @@ class OmniaWalletApp extends ConsumerStatefulWidget {
 }
 
 class _OmniaWalletAppState extends ConsumerState<OmniaWalletApp> {
+  // Bridges Riverpod's async wallet-existence state into a Listenable the
+  // router can refresh on. Built once so the router isn't recreated per build.
+  final ValueNotifier<int> _routerRefresh = ValueNotifier<int>(0);
+  late final GoRouter _router = _buildOnce();
+
+  GoRouter _buildOnce() {
+    // Re-run the router's redirect whenever wallet existence resolves/changes.
+    ref.listenManual(hasWalletProvider, (_, __) => _routerRefresh.value++);
+    return buildRouter(ref, _routerRefresh);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -33,14 +45,19 @@ class _OmniaWalletAppState extends ConsumerState<OmniaWalletApp> {
   }
 
   @override
+  void dispose() {
+    _routerRefresh.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final router = buildRouter(ref);
     return MaterialApp.router(
       title: 'Omnia Wallet',
       debugShowCheckedModeBanner: false,
       theme: OmniaTheme.light(),
       darkTheme: OmniaTheme.dark(),
-      routerConfig: router,
+      routerConfig: _router,
       builder: (context, child) =>
           AppLockGate(child: child ?? const SizedBox.shrink()),
     );

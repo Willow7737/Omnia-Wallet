@@ -152,8 +152,10 @@ class OmniaTheme {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        titleTextStyle: text.titleLarge?.copyWith(
-          fontWeight: FontWeight.w600,
+        toolbarHeight: 64,
+        titleTextStyle: text.headlineSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
           color: scheme.onSurface,
         ),
       ),

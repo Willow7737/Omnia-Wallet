@@ -11,6 +11,7 @@ import '../features/profile/profile_screen.dart';
 import '../features/receive/receive_screen.dart';
 import '../features/send/send_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/splash/splash_screen.dart';
 import '../state/providers.dart';
 import 'motion.dart';
 
@@ -21,19 +22,38 @@ Page<void> _page(GoRouterState state, Widget child) => fadeThroughPage<void>(
       child: child,
     );
 
-/// Builds the app router. Redirects to onboarding until a wallet exists.
-GoRouter buildRouter(WidgetRef ref) {
+/// Builds the app router.
+///
+/// Start at a splash while we asynchronously determine whether a wallet
+/// exists, so a first-time user is routed straight to onboarding instead of
+/// flashing the (empty) Home screen. [refresh] re-runs the redirect when the
+/// wallet-existence state resolves or changes.
+GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
+    refreshListenable: refresh,
     redirect: (context, state) {
-      final hasWallet = ref.read(hasWalletProvider).valueOrNull;
-      if (hasWallet == null) return null; // still loading
-      final onOnboarding = state.matchedLocation == '/onboarding';
-      if (!hasWallet && !onOnboarding) return '/onboarding';
-      if (hasWallet && onOnboarding) return '/';
+      final has = ref.read(hasWalletProvider);
+      final loc = state.matchedLocation;
+
+      // Still determining wallet existence → hold on the splash.
+      if (!has.hasValue) {
+        return loc == '/splash' ? null : '/splash';
+      }
+
+      final hasWallet = has.value ?? false;
+      if (!hasWallet) {
+        return loc == '/onboarding' ? null : '/onboarding';
+      }
+      // A wallet exists — never sit on splash/onboarding.
+      if (loc == '/splash' || loc == '/onboarding') return '/';
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/splash',
+        pageBuilder: (_, s) => _page(s, const SplashScreen()),
+      ),
       GoRoute(
         path: '/',
         pageBuilder: (_, s) => _page(s, const HomeScreen()),
