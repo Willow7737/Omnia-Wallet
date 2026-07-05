@@ -76,6 +76,15 @@ class SettingsScreen extends ConsumerWidget {
                 style: TextStyle(color: Theme.of(context).colorScheme.error)),
             onTap: () => _wipe(context, ref),
           ),
+          const Divider(),
+          const _SectionHeader('Advanced'),
+          ListTile(
+            leading: const Icon(Icons.lan_outlined),
+            title: const Text('Network'),
+            subtitle: const Text('Node status, version, peers'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/network'),
+          ),
         ],
       ),
     );

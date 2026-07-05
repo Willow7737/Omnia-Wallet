@@ -60,3 +60,8 @@ final balanceProvider = FutureProvider<Balance>((ref) async {
 final historyProvider = FutureProvider<List<TransferRecord>>((ref) async {
   return ref.watch(walletRepositoryProvider).history();
 });
+
+/// Public node status (health/version/peers). No auth required.
+final nodeInfoProvider = FutureProvider<NodeInfo>((ref) async {
+  return ref.watch(apiClientProvider).getNodeInfo();
+});

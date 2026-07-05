@@ -6,6 +6,7 @@ import '../features/contacts/contacts_screen.dart';
 import '../features/governance/governance_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
+import '../features/network/network_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/receive/receive_screen.dart';
@@ -89,6 +90,10 @@ GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
       GoRoute(
         path: '/profile',
         pageBuilder: (_, s) => _page(s, const ProfileScreen()),
+      ),
+      GoRoute(
+        path: '/network',
+        pageBuilder: (_, s) => _page(s, const NetworkScreen()),
       ),
     ],
   );
