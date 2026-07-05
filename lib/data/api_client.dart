@@ -107,13 +107,22 @@ class ApiClient {
   }
 
   /// `GET /api/v1/economics/transfers?limit=N`.
+  ///
+  /// A 404 (no history yet / unregistered DID) is treated as an empty list, so
+  /// a brand-new wallet shows "No transactions yet" instead of an error.
   Future<List<TransferRecord>> listTransfers(String token,
       {int limit = 50}) async {
-    final res = await _dio.get<Map<String, dynamic>>(
-      '/api/v1/economics/transfers',
-      queryParameters: {'limit': limit},
-      options: _auth(token),
-    );
+    final Response<Map<String, dynamic>> res;
+    try {
+      res = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/economics/transfers',
+        queryParameters: {'limit': limit},
+        options: _auth(token),
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return const [];
+      rethrow;
+    }
     final list = (res.data?['transfers'] as List<dynamic>? ?? [])
         .cast<Map<String, dynamic>>()
         .map(TransferRecord.fromJson)

@@ -226,7 +226,9 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                   helperText: _available == null
                       ? null
                       : 'Available: ${Fmt.ubc(_available!)}',
-                  suffix: TextButton(
+                  // NOTE: `suffix` + `suffixText` together is illegal in
+                  // Flutter; use `suffixIcon` for the Max action instead.
+                  suffixIcon: TextButton(
                     onPressed: _available == null ? null : _setMax,
                     child: const Text('Max'),
                   ),

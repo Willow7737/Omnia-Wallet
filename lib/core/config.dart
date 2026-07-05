@@ -9,8 +9,8 @@ library;
 class AppConfig {
   AppConfig._();
 
-  /// Default node base URL. `10.0.2.2` is the Android emulator's alias for the
-  /// host machine's `localhost`; override via --dart-define for real devices.
+  /// Default node base URL. Points at the live Omnia node; override at build
+  /// time with `--dart-define=OMNIA_NODE_URL=...` or at runtime in Settings.
   static const String defaultNodeUrl = String.fromEnvironment(
     'OMNIA_NODE_URL',
     defaultValue: 'https://78.47.43.136.sslip.io',
