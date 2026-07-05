@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
 import '../../core/motion.dart';
@@ -25,6 +26,15 @@ class HomeScreen extends ConsumerWidget {
         title: const Text('omnia'),
         actions: [
           IconButton(
+            tooltip: 'Governance',
+            icon: const Icon(Icons.how_to_vote_outlined),
+            onPressed: () {
+              Haptics.light();
+              context.push('/governance');
+            },
+          ),
+          IconButton(
+            tooltip: 'Settings',
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
               Haptics.light();
@@ -43,6 +53,10 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
+            if (balanceAsync.hasError) ...[
+              _OfflineBanner(error: friendlyError(balanceAsync.error!)),
+              const SizedBox(height: 16),
+            ],
             FadeSlideIn(child: _BalanceCard(balanceAsync: balanceAsync)),
             const SizedBox(height: 20),
             FadeSlideIn(
@@ -90,6 +104,42 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
+class _OfflineBanner extends StatelessWidget {
+  const _OfflineBanner({required this.error});
+  final FriendlyError error;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: scheme.errorContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: scheme.error.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            error.isOffline ? Icons.wifi_off_rounded : Icons.error_outline,
+            color: scheme.onErrorContainer,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              error.message,
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: scheme.onErrorContainer),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _BalanceCard extends StatelessWidget {
   const _BalanceCard({required this.balanceAsync});
   final AsyncValue<Balance> balanceAsync;
@@ -115,7 +165,7 @@ class _BalanceCard extends StatelessWidget {
             height: 96,
             child: Center(
               child: Text(
-                'Could not load balance:\n$e',
+                friendlyError(e).message,
                 textAlign: TextAlign.center,
               ),
             ),
@@ -219,7 +269,7 @@ class _RecentActivity extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.all(12),
-        child: Text('Could not load activity: $e'),
+        child: Text(friendlyError(e).message),
       ),
       data: (records) {
         if (records.isEmpty) {

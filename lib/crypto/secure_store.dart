@@ -53,10 +53,17 @@ class SecureStore {
   Future<void> setAppLockEnabled(bool enabled) async =>
       _storage.write(key: AppConfig.kAppLockKey, value: enabled.toString());
 
+  Future<String?> readContacts() async =>
+      _storage.read(key: AppConfig.kContactsKey);
+
+  Future<void> saveContacts(String json) async =>
+      _storage.write(key: AppConfig.kContactsKey, value: json);
+
   /// Irreversibly wipe all wallet material from the device.
   Future<void> wipe() async {
     await _storage.delete(key: AppConfig.kSeedKey);
     await _storage.delete(key: AppConfig.kMnemonicKey);
     await _storage.delete(key: AppConfig.kAppLockKey);
+    await _storage.delete(key: AppConfig.kContactsKey);
   }
 }
