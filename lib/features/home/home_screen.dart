@@ -26,6 +26,15 @@ class HomeScreen extends ConsumerWidget {
         title: const Text('omnia'),
         actions: [
           IconButton(
+            tooltip: 'Governance',
+            icon: const Icon(Icons.how_to_vote_outlined),
+            onPressed: () {
+              Haptics.light();
+              context.push('/governance');
+            },
+          ),
+          IconButton(
+            tooltip: 'Settings',
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
               Haptics.light();

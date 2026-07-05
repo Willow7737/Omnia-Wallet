@@ -20,15 +20,15 @@ Legend: ✅ done · 🔜 next · ⬜ planned.
 - ✅ CI: format + analyze + test
 
 ## Phase 2 — Security & polish
-- ⬜ **Address book**: save & label frequently-used recipient DIDs
-- ⬜ **Amount UX**: max button, balance-aware validation, confirmation of remaining balance
-- ⬜ **Copy/share polish**: share DID sheet, richer QR (with label), pull-to-refresh everywhere
-- ⬜ **Error surfaces**: friendlier network/timeout/401 messages; offline banner
+- ✅ **Address book**: save & label recipient DIDs; pick when sending
+- ✅ **Amount UX**: max button, balance-aware validation, live remaining-after-send
+- ✅ **Error surfaces**: friendly network/timeout/401 messages; offline banner
+- ⬜ **Copy/share polish**: share DID sheet, richer QR (with label)
 - ⬜ **Localization scaffolding** (i18n) and accessibility pass (semantics, contrast, dynamic type)
 
 ## Phase 3 — Protocol participation
 
-- ⬜ **Governance**: list proposals, view detail, cast votes (`/governance/proposals`, `/governance/vote`)
+- ✅ **Governance**: list proposals, cast votes, create proposals (`/governance/proposals`, `/governance/vote`)
 - ⬜ **Events**: submit and browse events (`/events`)
 - ⬜ **Validators**: view registered validators, stake, jail status (`/validators`)
 - ⬜ **Node/network status**: node info, peers, epoch countdown (`/node/info`, `/node/peers`)

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import 'governance.dart';
 import 'models.dart';
 
 /// Low-level HTTP client for the Omnia node REST API (`/api/v1/...`).
@@ -94,6 +95,54 @@ class ApiClient {
         .map(TransferRecord.fromJson)
         .toList();
     return list;
+  }
+
+  // ---- Governance (JWT) ----
+
+  /// `GET /api/v1/governance/proposals`.
+  Future<List<Proposal>> listProposals(String token) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/api/v1/governance/proposals',
+      options: _auth(token),
+    );
+    return (res.data?['proposals'] as List<dynamic>? ?? [])
+        .cast<Map<String, dynamic>>()
+        .map(Proposal.fromJson)
+        .toList();
+  }
+
+  /// `POST /api/v1/governance/vote`.
+  Future<CastVoteResult> castVote({
+    required String did,
+    required String proposalId,
+    required VoteChoice choice,
+    required String token,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/governance/vote',
+      data: {'did': did, 'proposal_id': proposalId, 'choice': choice.wire},
+      options: _auth(token),
+    );
+    return CastVoteResult.fromJson(res.data!);
+  }
+
+  /// `POST /api/v1/governance/proposals`.
+  Future<CreateProposalResult> createProposal({
+    required String id,
+    required String description,
+    required int expiresAtEpoch,
+    required String token,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/governance/proposals',
+      data: {
+        'id': id,
+        'description': description,
+        'expires_at_epoch': expiresAtEpoch,
+      },
+      options: _auth(token),
+    );
+    return CreateProposalResult.fromJson(res.data!);
   }
 }
 
