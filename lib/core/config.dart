@@ -13,7 +13,7 @@ class AppConfig {
   /// host machine's `localhost`; override via --dart-define for real devices.
   static const String defaultNodeUrl = String.fromEnvironment(
     'OMNIA_NODE_URL',
-    defaultValue: 'http://10.0.2.2:9090',
+    defaultValue: 'https://78.47.43.136.sslip.io',
   );
 
   /// Domain-separation prefix for the login challenge signature.
