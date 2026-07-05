@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/brand/brand.dart';
+import '../../core/brand/identicon.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
@@ -21,9 +23,13 @@ class HomeScreen extends ConsumerWidget {
     final balanceAsync = ref.watch(balanceProvider);
     final theme = Theme.of(context);
 
+    final identity = ref.watch(identityProvider).valueOrNull;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('omnia'),
+        titleSpacing: 20,
+        title: const BrandWordmark(markSize: 28, fontSize: 28),
+        toolbarHeight: 68,
         actions: [
           IconButton(
             tooltip: 'Governance',
@@ -41,6 +47,17 @@ class HomeScreen extends ConsumerWidget {
               context.push('/settings');
             },
           ),
+          if (identity != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 12, left: 4),
+              child: GestureDetector(
+                onTap: () {
+                  Haptics.light();
+                  context.push('/profile');
+                },
+                child: ClipOval(child: Identicon(seed: identity.did, size: 34)),
+              ),
+            ),
         ],
       ),
       body: RefreshIndicator(
@@ -185,16 +202,33 @@ class _BalanceCard extends StatelessWidget {
                 style: theme.textTheme.displaySmall,
               ),
               const SizedBox(height: 12),
-              Wrap(
-                spacing: 16,
-                children: [
-                  _Meta(
-                    label: 'Monthly quota',
-                    value: Fmt.number(b.monthlyQuota),
-                  ),
-                  _Meta(label: 'Epoch', value: '#${b.currentEpoch}'),
-                ],
-              ),
+              if (b.isRegistered)
+                Wrap(
+                  spacing: 16,
+                  children: [
+                    _Meta(
+                      label: 'Monthly quota',
+                      value: Fmt.number(b.monthlyQuota),
+                    ),
+                    _Meta(label: 'Epoch', value: '#${b.currentEpoch}'),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Icon(Icons.info_outline,
+                        size: 16, color: theme.colorScheme.onSurfaceVariant),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        'Not registered yet — activity or rewards will activate your UBC.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
             ],
           ),
         ),

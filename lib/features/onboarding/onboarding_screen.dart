@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/brand/brand.dart';
 import '../../core/haptics.dart';
 import '../../core/widgets/fade_slide_in.dart';
+import '../../core/widgets/press_scale.dart';
 import '../../state/providers.dart';
 
 /// First-run: create a new wallet (showing the recovery phrase) or import one.
@@ -65,47 +68,85 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Spacer(),
+              // Hero: brand mark over a soft halftone/blue glow illustration.
               FadeSlideIn(
-                child: Text('omnia', style: theme.textTheme.displaySmall),
+                child: SizedBox(
+                  height: 240,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/illustrations/hero_dots.svg',
+                        height: 300,
+                      ),
+                      const BrandMark(size: 104),
+                    ],
+                  ),
+                ),
+              ),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 60),
+                child: Center(
+                  child: Text('omnia', style: theme.textTheme.displaySmall),
+                ),
               ),
               const SizedBox(height: 8),
-              Text(
-                'A self-custodial wallet for Universal Basic Compute.',
-                style: theme.textTheme.bodyLarge
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              FadeSlideIn(
+                delay: const Duration(milliseconds: 100),
+                child: Text(
+                  'A self-custodial wallet for Universal Basic Compute.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge
+                      ?.copyWith(color: scheme.onSurfaceVariant),
+                ),
               ),
-              const Spacer(),
+              const SizedBox(height: 24),
+              const _Feature(
+                icon: Icons.key_outlined,
+                text:
+                    'Your keys are generated on this device and never leave it.',
+              ),
+              const _Feature(
+                icon: Icons.bolt_outlined,
+                text: 'Send UBC and check your balance in a tap.',
+              ),
+              const _Feature(
+                icon: Icons.how_to_vote_outlined,
+                text: 'Vote on governance proposals.',
+              ),
+              const SizedBox(height: 28),
               if (_busy)
-                const Center(child: CircularProgressIndicator())
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
               else ...[
-                FilledButton(
-                  onPressed: _create,
-                  child: const Text('Create a new wallet'),
+                _MethodCard(
+                  icon: Icons.add_circle_outline,
+                  title: 'Create a new wallet',
+                  subtitle: 'Generate a fresh recovery phrase',
+                  primary: true,
+                  onTap: _create,
                 ),
                 const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: _import,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                  ),
-                  child: const Text('Import from recovery phrase'),
+                _MethodCard(
+                  icon: Icons.download_outlined,
+                  title: 'Import from recovery phrase',
+                  subtitle: 'Restore an existing wallet',
+                  primary: false,
+                  onTap: _import,
                 ),
               ],
-              const SizedBox(height: 24),
-              Text(
-                'Your keys are generated on this device and never leave it.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
             ],
           ),
         ),
@@ -213,6 +254,91 @@ class _ImportDialogState extends State<_ImportDialog> {
           child: const Text('Import'),
         ),
       ],
+    );
+  }
+}
+
+/// A small icon + text row used for the onboarding value props.
+class _Feature extends StatelessWidget {
+  const _Feature({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(text, style: theme.textTheme.bodyMedium),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A tappable "sign-in method" card for the onboarding actions.
+class _MethodCard extends StatelessWidget {
+  const _MethodCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.primary,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool primary;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final bg = primary ? scheme.primary : scheme.surfaceContainerHighest;
+    final fg = primary ? scheme.onPrimary : scheme.onSurface;
+    final sub = primary
+        ? scheme.onPrimary.withValues(alpha: 0.85)
+        : scheme.onSurfaceVariant;
+
+    return PressScale(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(18),
+          border: primary ? null : Border.all(color: scheme.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: fg),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleMedium
+                        ?.copyWith(color: fg, fontWeight: FontWeight.w600),
+                  ),
+                  Text(subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(color: sub)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, color: sub),
+          ],
+        ),
+      ),
     );
   }
 }

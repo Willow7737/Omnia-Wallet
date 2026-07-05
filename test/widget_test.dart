@@ -27,7 +27,9 @@ void main() {
         child: MaterialApp(home: OnboardingScreen()),
       ),
     );
-    await tester.pump();
+    // Advance past the staggered FadeSlideIn entrance delays/animations so no
+    // timers remain pending at the end of the test.
+    await tester.pump(const Duration(milliseconds: 600));
 
     expect(find.text('Create a new wallet'), findsOneWidget);
     expect(find.text('Import from recovery phrase'), findsOneWidget);
