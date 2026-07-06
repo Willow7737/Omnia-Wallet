@@ -68,7 +68,7 @@ void main() {
       final id2 = km.identityFromSeed(seed);
       expect(id1.publicKeyHex, id2.publicKeyHex);
       expect(id1.did, id2.did);
-      expect(id1.publicKeyHex.length, 64); // 32 bytes hex
+      expect(id1.publicKeyHex!.length, 64); // 32 bytes hex
     });
 
     test('signature over the challenge message verifies', () {

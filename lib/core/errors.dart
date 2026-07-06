@@ -52,11 +52,16 @@ FriendlyError friendlyError(Object error) {
 
 FriendlyError _fromStatus(DioException error) {
   final status = error.response?.statusCode ?? 0;
-  // Prefer the node's own `{ "error": "..." }` message when present.
+  // Prefer the server's own message when present: the node uses
+  // `{ "error": ... }`, the Supabase edge function `{ "message": ... }`.
   final data = error.response?.data;
   String? serverMsg;
-  if (data is Map && data['error'] is String) {
-    serverMsg = data['error'] as String;
+  if (data is Map) {
+    if (data['error'] is String) {
+      serverMsg = data['error'] as String;
+    } else if (data['message'] is String) {
+      serverMsg = data['message'] as String;
+    }
   }
   switch (status) {
     case 400:

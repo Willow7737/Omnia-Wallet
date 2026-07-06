@@ -18,6 +18,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final identityAsync = ref.watch(identityProvider);
     final displayName = ref.watch(displayNameProvider).valueOrNull;
+    final email = ref.watch(supabaseEmailProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -71,6 +72,14 @@ class ProfileScreen extends ConsumerWidget {
               Card(
                 child: Column(
                   children: [
+                    if (email != null) ...[
+                      ListTile(
+                        leading: const Icon(Icons.person_outline),
+                        title: const Text('Signed in as'),
+                        subtitle: Text(email),
+                      ),
+                      const Divider(height: 1),
+                    ],
                     ListTile(
                       leading: const Icon(Icons.badge_outlined),
                       title: const Text('DID'),

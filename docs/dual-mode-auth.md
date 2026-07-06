@@ -34,13 +34,25 @@ supabase secrets set OMNIA_JWT_SECRET=<the same secret the node runs with> \
   --project-ref iyajzmgnykgkivabxiuw
 ```
 
-## What the wallet client still needs (to finish Mode B)
-- `SUPABASE_URL` = `https://iyajzmgnykgkivabxiuw.supabase.co`
-- `SUPABASE_ANON_KEY` (public; safe to ship / pass via `--dart-define`)
-- The deployed `mint-node-jwt` function URL
+## Wallet client wire-up (implemented)
+- `supabase_flutter` is initialised at app start (`SupabaseFlutterGateway.init`)
+  with `AppConfig.supabaseUrl` / `AppConfig.supabaseAnonKey` — both have
+  working defaults and can be overridden via
+  `--dart-define=OMNIA_SUPABASE_URL=... --dart-define=OMNIA_SUPABASE_ANON_KEY=...`
+  (the anon key is public by design).
+- Onboarding has a third card, **"Sign in with your Omnia account"** →
+  `/signin` with Google, GitHub, and email + password.
+- After Supabase authenticates, `AuthRepository.completeSupabaseSignIn()`
+  calls the edge function via `MintJwtClient`, stores the DID + auth mode, and
+  every subsequent `ensureSession()` transparently re-mints the node JWT.
+- OAuth returns to the app via the deep link `io.omnia.wallet://login-callback/`
+  (intent filter in `AndroidManifest.xml`, `CFBundleURLTypes` in `Info.plist`).
+- Mode-aware UI: Settings hides "Reveal recovery phrase" and offers
+  **Sign out** instead of wallet removal; Profile shows the account email.
 
-Wire-up (next step): add `supabase_flutter`, an onboarding "Sign in" path
-(Google / GitHub / email), fetch the DID + node JWT via the function, and route
-the existing repositories through the resulting session. OAuth on mobile also
-needs a deep-link redirect scheme configured in `AndroidManifest.xml` /
-`Info.plist`.
+## Remaining server-side checklist
+1. **`OMNIA_JWT_SECRET`** must be set on the Supabase project (Dashboard →
+   Edge Functions → Secrets) to the **exact HMAC secret the node runs with** —
+   NOT the anon key. Until then the node rejects minted JWTs with 401.
+2. Add `io.omnia.wallet://login-callback/` to Supabase → Auth →
+   URL Configuration → **Redirect URLs** (needed for Google/GitHub sign-in).

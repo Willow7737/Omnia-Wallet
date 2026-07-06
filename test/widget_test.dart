@@ -33,5 +33,6 @@ void main() {
 
     expect(find.text('Create a new wallet'), findsOneWidget);
     expect(find.text('Import from recovery phrase'), findsOneWidget);
+    expect(find.text('Sign in with your Omnia account'), findsOneWidget);
   });
 }
