@@ -6,6 +6,17 @@
 	<string>Scan a recipient's Omnia DID QR code.</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Confirm with Face ID before signing a transaction.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>io.omnia.wallet</string>
+			</array>
+		</dict>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>

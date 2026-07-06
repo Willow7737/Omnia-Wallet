@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../core/auth_mode.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
@@ -86,6 +87,14 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       Haptics.selection();
       _amountController.text = bal.toString();
     }
+  }
+
+  String _signedByLine(WidgetRef ref) {
+    final mode =
+        ref.watch(authModeProvider).valueOrNull ?? AuthMode.selfCustody;
+    return mode == AuthMode.supabase
+        ? 'Authorized through your Omnia account.'
+        : 'Signed on-device with your private key.';
   }
 
   Future<bool> _confirmWithBiometrics() async {
@@ -253,8 +262,8 @@ class _SendScreenState extends ConsumerState<SendScreen> {
               const SizedBox(height: 12),
               Text(
                 contacts.isEmpty
-                    ? 'Signed on-device with your private key.'
-                    : 'Signed on-device with your private key. '
+                    ? _signedByLine(ref)
+                    : '${_signedByLine(ref)} '
                         'Tap the contacts icon to reuse a saved DID.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodySmall

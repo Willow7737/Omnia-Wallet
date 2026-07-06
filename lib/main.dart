@@ -5,11 +5,15 @@ import 'package:go_router/go_router.dart';
 import 'core/config.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
+import 'data/supabase_gateway.dart';
 import 'features/lock/app_lock_gate.dart';
 import 'state/providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Mode B (Supabase sign-in). Failure only disables sign-in — never blocks
+  // launch, since Mode A is fully local.
+  await SupabaseFlutterGateway.init();
   runApp(const ProviderScope(child: OmniaWalletApp()));
 }
 

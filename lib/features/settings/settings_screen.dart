@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth_mode.dart';
 import '../../core/haptics.dart';
 import '../lock/app_lock.dart';
 import '../../state/providers.dart';
@@ -14,6 +15,9 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final nodeUrl = ref.watch(nodeUrlProvider);
     final identityAsync = ref.watch(identityProvider);
+    final mode =
+        ref.watch(authModeProvider).valueOrNull ?? AuthMode.selfCustody;
+    final isSupabase = mode == AuthMode.supabase;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
@@ -64,17 +68,20 @@ class SettingsScreen extends ConsumerWidget {
             value: ref.watch(appLockProvider.select((s) => s.enabled)),
             onChanged: (v) => _toggleAppLock(context, ref, v),
           ),
+          // Supabase accounts have no on-device key, so no phrase to reveal.
+          if (!isSupabase)
+            ListTile(
+              leading: const Icon(Icons.key_outlined),
+              title: const Text('Reveal recovery phrase'),
+              onTap: () => _revealPhrase(context, ref),
+            ),
           ListTile(
-            leading: const Icon(Icons.key_outlined),
-            title: const Text('Reveal recovery phrase'),
-            onTap: () => _revealPhrase(context, ref),
-          ),
-          ListTile(
-            leading: Icon(Icons.delete_outline,
+            leading: Icon(isSupabase ? Icons.logout : Icons.delete_outline,
                 color: Theme.of(context).colorScheme.error),
-            title: Text('Remove wallet from this device',
+            title: Text(
+                isSupabase ? 'Sign out' : 'Remove wallet from this device',
                 style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            onTap: () => _wipe(context, ref),
+            onTap: () => _wipe(context, ref, isSupabase: isSupabase),
           ),
           const Divider(),
           const _SectionHeader('Advanced'),
@@ -164,14 +171,19 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _wipe(BuildContext context, WidgetRef ref) async {
+  Future<void> _wipe(BuildContext context, WidgetRef ref,
+      {required bool isSupabase}) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Remove wallet?'),
-        content: const Text(
-          'This deletes your keys from this device. You can only restore the '
-          'wallet with your recovery phrase. Make sure it is backed up.',
+        title: Text(isSupabase ? 'Sign out?' : 'Remove wallet?'),
+        content: Text(
+          isSupabase
+              ? 'This signs you out on this device. Your DID and balance stay '
+                  'with your account — sign back in any time.'
+              : 'This deletes your keys from this device. You can only restore '
+                  'the wallet with your recovery phrase. Make sure it is '
+                  'backed up.',
         ),
         actions: [
           TextButton(
@@ -182,7 +194,7 @@ class SettingsScreen extends ConsumerWidget {
             style: FilledButton.styleFrom(
                 backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Remove'),
+            child: Text(isSupabase ? 'Sign out' : 'Remove'),
           ),
         ],
       ),
@@ -191,6 +203,7 @@ class SettingsScreen extends ConsumerWidget {
     await ref.read(authRepositoryProvider).logout();
     ref.invalidate(hasWalletProvider);
     ref.invalidate(identityProvider);
+    ref.invalidate(authModeProvider);
     if (context.mounted) context.go('/onboarding');
   }
 }

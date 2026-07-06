@@ -38,6 +38,10 @@ dependencies:
   # Navigation
   go_router: ^14.2.7
 
+  # Mode B sign-in: existing Omnia accounts (Google / GitHub / email) from
+  # the web app; a node JWT is minted by the mint-node-jwt edge function.
+  supabase_flutter: ^2.8.0
+
   # Vector brand art & illustrations
   flutter_svg: ^2.0.17
 

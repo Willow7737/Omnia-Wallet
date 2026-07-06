@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:convert/convert.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../core/auth_mode.dart';
 import '../core/config.dart';
 
 /// Thin wrapper over platform-backed secure storage (iOS Keychain /
@@ -65,6 +66,20 @@ class SecureStore {
   Future<void> saveDisplayName(String name) async =>
       _storage.write(key: AppConfig.kDisplayNameKey, value: name);
 
+  /// The active auth mode. Defaults to self-custody when unset.
+  Future<AuthMode> readAuthMode() async =>
+      AuthMode.fromWire(await _storage.read(key: AppConfig.kAuthModeKey));
+
+  Future<void> saveAuthMode(AuthMode mode) async =>
+      _storage.write(key: AppConfig.kAuthModeKey, value: mode.wire);
+
+  /// The DID linked to the signed-in Supabase account (Mode B only).
+  Future<String?> readSupabaseDid() async =>
+      _storage.read(key: AppConfig.kSupabaseDidKey);
+
+  Future<void> saveSupabaseDid(String did) async =>
+      _storage.write(key: AppConfig.kSupabaseDidKey, value: did);
+
   /// Irreversibly wipe all wallet material from the device.
   Future<void> wipe() async {
     await _storage.delete(key: AppConfig.kSeedKey);
@@ -72,5 +87,7 @@ class SecureStore {
     await _storage.delete(key: AppConfig.kAppLockKey);
     await _storage.delete(key: AppConfig.kContactsKey);
     await _storage.delete(key: AppConfig.kDisplayNameKey);
+    await _storage.delete(key: AppConfig.kAuthModeKey);
+    await _storage.delete(key: AppConfig.kSupabaseDidKey);
   }
 }

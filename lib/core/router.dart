@@ -12,6 +12,7 @@ import '../features/profile/profile_screen.dart';
 import '../features/receive/receive_screen.dart';
 import '../features/send/send_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/signin/signin_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../state/providers.dart';
 import 'motion.dart';
@@ -44,10 +45,15 @@ GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
 
       final hasWallet = has.value ?? false;
       if (!hasWallet) {
-        return loc == '/onboarding' ? null : '/onboarding';
+        // Sign-in (Mode B) is part of the no-wallet funnel too.
+        return (loc == '/onboarding' || loc == '/signin')
+            ? null
+            : '/onboarding';
       }
-      // A wallet exists — never sit on splash/onboarding.
-      if (loc == '/splash' || loc == '/onboarding') return '/';
+      // An identity exists — never sit on splash/onboarding/sign-in.
+      if (loc == '/splash' || loc == '/onboarding' || loc == '/signin') {
+        return '/';
+      }
       return null;
     },
     routes: [
@@ -62,6 +68,10 @@ GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
       GoRoute(
         path: '/onboarding',
         pageBuilder: (_, s) => _page(s, const OnboardingScreen()),
+      ),
+      GoRoute(
+        path: '/signin',
+        pageBuilder: (_, s) => _page(s, const SignInScreen()),
       ),
       GoRoute(
         path: '/send',

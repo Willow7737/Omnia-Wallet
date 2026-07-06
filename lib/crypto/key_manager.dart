@@ -5,15 +5,26 @@ import 'package:convert/convert.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 
-/// A self-custodial identity derived from an Ed25519 keypair.
+import '../core/auth_mode.dart';
+
+/// The wallet's identity: either derived from an on-device Ed25519 keypair
+/// (self-custody) or linked to a Supabase account (server-assisted).
 class WalletIdentity {
-  WalletIdentity({required this.publicKeyHex, required this.did});
+  WalletIdentity({
+    required this.did,
+    this.publicKeyHex,
+    this.mode = AuthMode.selfCustody,
+  });
 
-  /// Hex-encoded 32-byte Ed25519 public key.
-  final String publicKeyHex;
+  /// Hex-encoded 32-byte Ed25519 public key. Null in Supabase mode — those
+  /// accounts have no on-device key.
+  final String? publicKeyHex;
 
-  /// `did:omnia:...` derived from the public key.
+  /// `did:omnia:...` — derived from the public key (Mode A) or assigned by
+  /// the web signup trigger (Mode B).
   final String did;
+
+  final AuthMode mode;
 }
 
 /// Pure key/identity operations — no I/O, no storage. Deterministic and unit

@@ -44,6 +44,19 @@ void main() {
       expect(f.message, 'Transfer amount must be greater than zero');
     });
 
+    test('falls back to the edge function `message` field', () {
+      final e = DioException(
+        requestOptions: _req(),
+        type: DioExceptionType.badResponse,
+        response: Response(
+          requestOptions: _req(),
+          statusCode: 404,
+          data: {'code': 'NO_DID', 'message': 'No DID linked to this account'},
+        ),
+      );
+      expect(friendlyError(e).message, 'No DID linked to this account');
+    });
+
     test('401 gives a session-expired message', () {
       final e = DioException(
         requestOptions: _req(),
