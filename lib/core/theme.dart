@@ -152,10 +152,13 @@ class OmniaTheme {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         centerTitle: false,
-        toolbarHeight: 64,
-        titleTextStyle: text.headlineSmall?.copyWith(
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.3,
+        toolbarHeight: 72,
+        // Screen titles (Profile, Send UBC, History, Settings, Governance…)
+        // read as page headings: large and heavy.
+        titleTextStyle: text.headlineMedium?.copyWith(
+          fontSize: 30,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.6,
           color: scheme.onSurface,
         ),
       ),
