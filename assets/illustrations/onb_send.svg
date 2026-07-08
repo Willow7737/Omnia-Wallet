@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 260">
+  <!-- Scrapbook collage: paper plane + ballot. Send & governance slide. -->
+  <rect x="8" y="8" width="304" height="244" rx="28" fill="#F1EBDD"/>
+  <rect x="8" y="8" width="304" height="244" rx="28" fill="none" stroke="#E2D8C0" stroke-width="2"/>
+
+  <path d="M60 52 l3.5 9 9 3.5 -9 3.5 -3.5 9 -3.5 -9 -9 -3.5 9 -3.5 z" fill="#C4858F"/>
+  <path d="M270 92 l2.5 6.5 6.5 2.5 -6.5 2.5 -2.5 6.5 -2.5 -6.5 -6.5 -2.5 6.5 -2.5 z" fill="#7C5230"/>
+  <path d="M286 210 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 z" fill="#8A9A5B"/>
+  <circle cx="40" cy="140" r="3" fill="#C9A44C"/>
+
+  <!-- dotted flight trail -->
+  <g fill="#C4858F">
+    <circle cx="60" cy="120" r="3"/>
+    <circle cx="80" cy="106" r="3"/>
+    <circle cx="102" cy="96" r="3"/>
+    <circle cx="126" cy="90" r="3"/>
+  </g>
+
+  <!-- paper plane -->
+  <g transform="rotate(10 190 86)">
+    <path d="M148 96 L252 60 L206 122 z" fill="#D9A0A6" stroke="#C4858F" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M148 96 L206 92 L206 122 z" fill="#C4858F"/>
+  </g>
+
+  <!-- ballot box -->
+  <g transform="rotate(-4 150 186)">
+    <rect x="96" y="164" width="108" height="64" rx="12" fill="#8A9A5B" stroke="#6C7C3F" stroke-width="3"/>
+    <rect x="132" y="158" width="36" height="10" rx="5" fill="#6C7C3F"/>
+    <!-- ballot slip going in -->
+    <g transform="rotate(-14 150 140)">
+      <rect x="128" y="118" width="44" height="34" rx="6" fill="#FBF8F0" stroke="#7C5230" stroke-width="3"/>
+      <path d="M138 134 l7 8 13 -14" fill="none" stroke="#C4858F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <circle cx="150" cy="200" r="8" fill="#C9A44C"/>
+  </g>
+</svg>

@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 260">
+  <!-- Scrapbook collage: bell + gazette. Notifications & news slide. -->
+  <rect x="8" y="8" width="304" height="244" rx="28" fill="#F1EBDD"/>
+  <rect x="8" y="8" width="304" height="244" rx="28" fill="none" stroke="#E2D8C0" stroke-width="2"/>
+
+  <path d="M270 44 l3.5 9 9 3.5 -9 3.5 -3.5 9 -3.5 -9 -9 -3.5 9 -3.5 z" fill="#8A9A5B"/>
+  <path d="M46 74 l2.5 6.5 6.5 2.5 -6.5 2.5 -2.5 6.5 -2.5 -6.5 -6.5 -2.5 6.5 -2.5 z" fill="#7C5230"/>
+  <path d="M60 216 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 z" fill="#C4858F"/>
+  <circle cx="284" cy="150" r="3" fill="#C9A44C"/>
+
+  <!-- gazette page -->
+  <g transform="rotate(-5 120 160)">
+    <rect x="52" y="104" width="140" height="112" rx="12" fill="#FBF8F0" stroke="#7C5230" stroke-width="3"/>
+    <rect x="66" y="118" width="76" height="12" rx="6" fill="#7C5230"/>
+    <rect x="66" y="140" width="112" height="34" rx="8" fill="#D9A0A6"/>
+    <rect x="66" y="184" width="112" height="6" rx="3" fill="#C9B58C"/>
+    <rect x="66" y="196" width="88" height="6" rx="3" fill="#C9B58C"/>
+  </g>
+
+  <!-- bell -->
+  <g transform="rotate(12 226 120)">
+    <path d="M226 66 q34 0 34 40 l0 18 q0 10 10 14 l-88 0 q10 -4 10 -14 l0 -18 q0 -40 34 -40 z"
+          fill="#C9A44C" stroke="#A9863A" stroke-width="3" stroke-linejoin="round"/>
+    <circle cx="226" cy="62" r="6" fill="#A9863A"/>
+    <circle cx="226" cy="148" r="9" fill="#7C5230"/>
+    <!-- ring lines -->
+    <path d="M176 78 q-8 10 -8 24" fill="none" stroke="#C4858F" stroke-width="4" stroke-linecap="round"/>
+    <path d="M276 78 q8 10 8 24" fill="none" stroke="#C4858F" stroke-width="4" stroke-linecap="round"/>
+  </g>
+
+  <!-- tiny leaf -->
+  <path d="M232 196 q20 -18 38 -10 q-8 24 -32 24 q-4 0 -6 -14 z" fill="#8A9A5B"/>
+</svg>
