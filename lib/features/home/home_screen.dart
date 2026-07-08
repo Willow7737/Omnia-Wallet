@@ -13,6 +13,7 @@ import '../../core/widgets/animated_count.dart';
 import '../../core/widgets/fade_slide_in.dart';
 import '../../core/widgets/shimmer.dart';
 import '../../data/models.dart';
+import '../../state/news.dart';
 import '../../state/notices.dart';
 import '../../state/providers.dart';
 
@@ -25,6 +26,9 @@ class HomeScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     final identity = ref.watch(identityProvider).valueOrNull;
+    // Fetch news in the background so a fresh post files a notification
+    // even before the user opens the News tab.
+    ref.watch(newsPostsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -32,6 +36,14 @@ class HomeScreen extends ConsumerWidget {
         title: const BrandWordmark(markSize: 28, fontSize: 28),
         toolbarHeight: 68,
         actions: [
+          IconButton(
+            tooltip: 'News',
+            icon: const Icon(Icons.newspaper_outlined),
+            onPressed: () {
+              Haptics.light();
+              context.push('/news');
+            },
+          ),
           const _NotificationsBell(),
           IconButton(
             tooltip: 'Governance',
