@@ -13,6 +13,7 @@ import '../../core/widgets/animated_count.dart';
 import '../../core/widgets/fade_slide_in.dart';
 import '../../core/widgets/shimmer.dart';
 import '../../data/models.dart';
+import '../../state/notices.dart';
 import '../../state/providers.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -31,6 +32,7 @@ class HomeScreen extends ConsumerWidget {
         title: const BrandWordmark(markSize: 28, fontSize: 28),
         toolbarHeight: 68,
         actions: [
+          const _NotificationsBell(),
           IconButton(
             tooltip: 'Governance',
             icon: const Icon(Icons.how_to_vote_outlined),
@@ -116,6 +118,52 @@ class HomeScreen extends ConsumerWidget {
             _RecentActivity(),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Bell icon with an unread-count badge.
+class _NotificationsBell extends ConsumerWidget {
+  const _NotificationsBell();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unread = ref.watch(unreadNoticesProvider);
+    return IconButton(
+      tooltip: 'Notifications',
+      onPressed: () {
+        Haptics.light();
+        context.push('/notifications');
+      },
+      icon: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          const Icon(Icons.notifications_none),
+          if (unread > 0)
+            Positioned(
+              right: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                constraints: const BoxConstraints(minWidth: 16),
+                height: 16,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.error,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  unread > 9 ? '9+' : '$unread',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onError,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

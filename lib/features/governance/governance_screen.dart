@@ -7,6 +7,7 @@ import '../../core/theme.dart';
 import '../../core/widgets/fade_slide_in.dart';
 import '../../data/governance.dart';
 import '../../state/governance.dart';
+import '../../state/notices.dart';
 import '../../state/providers.dart';
 
 class GovernanceScreen extends ConsumerWidget {
@@ -180,6 +181,12 @@ class _ProposalCardState extends ConsumerState<_ProposalCard> {
           .read(governanceRepositoryProvider)
           .vote(widget.proposal.id, choice);
       ref.invalidate(proposalsProvider);
+      ref.read(noticesProvider.notifier).add(
+            type: NoticeType.vote,
+            title: 'Vote recorded: ${result.choice}',
+            body: 'On "${widget.proposal.id}" · weight '
+                '${result.effectiveWeight}',
+          );
       if (!mounted) return;
       Haptics.success();
       ScaffoldMessenger.of(context).showSnackBar(

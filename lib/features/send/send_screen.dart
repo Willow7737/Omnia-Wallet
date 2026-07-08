@@ -9,6 +9,7 @@ import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
 import '../../state/contacts.dart';
+import '../../state/notices.dart';
 import '../../state/providers.dart';
 import '../contacts/contacts_screen.dart';
 import 'scan_did_screen.dart';
@@ -133,6 +134,12 @@ class _SendScreenState extends ConsumerState<SendScreen> {
           .send(toDid: toDid, amount: amount);
       ref.invalidate(balanceProvider);
       ref.invalidate(historyProvider);
+      ref.read(noticesProvider.notifier).add(
+            type: NoticeType.sent,
+            title: 'Sent ${Fmt.ubc(result.amount)}',
+            body: 'To ${Fmt.shortDid(toDid)} · '
+                'new balance ${Fmt.ubc(result.newBalance)}',
+          );
       if (!mounted) return;
       Haptics.success();
       ScaffoldMessenger.of(context).showSnackBar(

@@ -13,6 +13,16 @@ class Fmt {
 
   static String dateTime(DateTime dt) => _date.format(dt);
 
+  /// Compact relative time for feeds: `now`, `5m`, `3h`, `2d`, else a date.
+  static String relative(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inMinutes < 1) return 'now';
+    if (diff.inHours < 1) return '${diff.inMinutes}m';
+    if (diff.inDays < 1) return '${diff.inHours}h';
+    if (diff.inDays < 7) return '${diff.inDays}d';
+    return _date.format(dt);
+  }
+
   /// Abbreviate a DID for compact display: `did:omnia:1a2b…9f0e`.
   static String shortDid(String did) {
     const prefix = 'did:omnia:';
