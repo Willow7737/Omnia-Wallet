@@ -87,6 +87,13 @@ class SecureStore {
   Future<void> saveNotices(String json) async =>
       _storage.write(key: AppConfig.kNoticesKey, value: json);
 
+  /// ID of the newest news post the user has already been alerted about.
+  Future<String?> readLastSeenNews() async =>
+      _storage.read(key: AppConfig.kLastSeenNewsKey);
+
+  Future<void> saveLastSeenNews(String id) async =>
+      _storage.write(key: AppConfig.kLastSeenNewsKey, value: id);
+
   /// Irreversibly wipe all wallet material from the device.
   Future<void> wipe() async {
     await _storage.delete(key: AppConfig.kSeedKey);
@@ -97,5 +104,6 @@ class SecureStore {
     await _storage.delete(key: AppConfig.kAuthModeKey);
     await _storage.delete(key: AppConfig.kSupabaseDidKey);
     await _storage.delete(key: AppConfig.kNoticesKey);
+    await _storage.delete(key: AppConfig.kLastSeenNewsKey);
   }
 }

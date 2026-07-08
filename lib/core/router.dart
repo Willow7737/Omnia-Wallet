@@ -6,7 +6,10 @@ import '../features/contacts/contacts_screen.dart';
 import '../features/governance/governance_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
+import '../data/news.dart';
 import '../features/network/network_screen.dart';
+import '../features/news/news_post_screen.dart';
+import '../features/news/news_screen.dart';
 import '../features/notifications/notifications_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/profile/profile_screen.dart';
@@ -109,6 +112,18 @@ GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
       GoRoute(
         path: '/notifications',
         pageBuilder: (_, s) => _page(s, const NotificationsScreen()),
+      ),
+      GoRoute(
+        path: '/news',
+        pageBuilder: (_, s) => _page(s, const NewsScreen()),
+      ),
+      GoRoute(
+        path: '/news/:id',
+        // The feed passes the post along; a bare deep link falls back to
+        // the feed rather than fetching a single post.
+        redirect: (context, s) => s.extra is NewsPost ? null : '/news',
+        pageBuilder: (_, s) =>
+            _page(s, NewsPostScreen(post: s.extra! as NewsPost)),
       ),
     ],
   );
