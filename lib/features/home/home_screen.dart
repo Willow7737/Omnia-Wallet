@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/brand/brand.dart';
-import '../../core/brand/identicon.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
@@ -12,6 +11,7 @@ import '../../core/theme.dart';
 import '../../core/widgets/animated_count.dart';
 import '../../core/widgets/fade_slide_in.dart';
 import '../../core/widgets/shimmer.dart';
+import '../../core/widgets/user_avatar.dart';
 import '../../data/models.dart';
 import '../../state/news.dart';
 import '../../state/notices.dart';
@@ -25,7 +25,6 @@ class HomeScreen extends ConsumerWidget {
     final balanceAsync = ref.watch(balanceProvider);
     final theme = Theme.of(context);
 
-    final identity = ref.watch(identityProvider).valueOrNull;
     // Fetch news in the background so a fresh post files a notification
     // even before the user opens the News tab.
     ref.watch(newsPostsProvider);
@@ -35,44 +34,8 @@ class HomeScreen extends ConsumerWidget {
         titleSpacing: 20,
         title: const BrandWordmark(markSize: 28, fontSize: 28),
         toolbarHeight: 68,
-        actions: [
-          IconButton(
-            tooltip: 'News',
-            icon: const Icon(Icons.newspaper_outlined),
-            onPressed: () {
-              Haptics.light();
-              context.push('/news');
-            },
-          ),
-          const _NotificationsBell(),
-          IconButton(
-            tooltip: 'Governance',
-            icon: const Icon(Icons.how_to_vote_outlined),
-            onPressed: () {
-              Haptics.light();
-              context.push('/governance');
-            },
-          ),
-          IconButton(
-            tooltip: 'Settings',
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              Haptics.light();
-              context.push('/settings');
-            },
-          ),
-          if (identity != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 12, left: 4),
-              child: GestureDetector(
-                onTap: () {
-                  Haptics.light();
-                  context.push('/profile');
-                },
-                child: ClipOval(child: Identicon(seed: identity.did, size: 34)),
-              ),
-            ),
-        ],
+        // One uncluttered entry point: everything lives in the avatar menu.
+        actions: const [_AvatarMenu()],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -135,48 +98,113 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// Bell icon with an unread-count badge.
-class _NotificationsBell extends ConsumerWidget {
-  const _NotificationsBell();
+/// The avatar in the top bar: shows an unread dot and opens a dropdown with
+/// Profile, Notifications, News, Governance, and Settings.
+class _AvatarMenu extends ConsumerWidget {
+  const _AvatarMenu();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final unread = ref.watch(unreadNoticesProvider);
-    return IconButton(
-      tooltip: 'Notifications',
-      onPressed: () {
-        Haptics.light();
-        context.push('/notifications');
+    final scheme = Theme.of(context).colorScheme;
+
+    return PopupMenuButton<String>(
+      tooltip: 'Menu',
+      offset: const Offset(0, 52),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      onOpened: Haptics.light,
+      onSelected: (route) {
+        Haptics.selection();
+        context.push(route);
       },
-      icon: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          const Icon(Icons.notifications_none),
-          if (unread > 0)
-            Positioned(
-              right: -4,
-              top: -4,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                constraints: const BoxConstraints(minWidth: 16),
-                height: 16,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.error,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  unread > 9 ? '9+' : '$unread',
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onError,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
+      itemBuilder: (_) => [
+        const PopupMenuItem(
+          value: '/profile',
+          child: _MenuRow(icon: Icons.person_outline, label: 'Profile'),
+        ),
+        PopupMenuItem(
+          value: '/notifications',
+          child: _MenuRow(
+            icon: Icons.notifications_none,
+            label: 'Notifications',
+            badgeCount: unread,
+          ),
+        ),
+        const PopupMenuItem(
+          value: '/news',
+          child: _MenuRow(icon: Icons.newspaper_outlined, label: 'News'),
+        ),
+        const PopupMenuItem(
+          value: '/governance',
+          child:
+              _MenuRow(icon: Icons.how_to_vote_outlined, label: 'Governance'),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem(
+          value: '/settings',
+          child: _MenuRow(icon: Icons.settings_outlined, label: 'Settings'),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.only(right: 16, left: 8),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const UserAvatar(size: 36),
+            if (unread > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: scheme.error,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: scheme.surface, width: 2),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({required this.icon, required this.label, this.badgeCount});
+
+  final IconData icon;
+  final String label;
+  final int? badgeCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+        const SizedBox(width: 12),
+        Text(label),
+        const Spacer(),
+        if ((badgeCount ?? 0) > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: scheme.error,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              badgeCount! > 9 ? '9+' : '$badgeCount',
+              style: TextStyle(
+                color: scheme.onError,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

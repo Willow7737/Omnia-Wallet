@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../core/brand/identicon.dart';
+import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
 import '../../core/widgets/fade_slide_in.dart';
+import '../../core/widgets/user_avatar.dart';
+import '../../state/avatar.dart';
 import '../../state/providers.dart';
 
 /// The user's identity at a glance: a generated identicon avatar, an editable
@@ -39,17 +41,36 @@ class ProfileScreen extends ConsumerWidget {
               FadeSlideIn(
                 child: Column(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: theme.colorScheme.outlineVariant,
-                          width: 2,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: Identicon(seed: identity.did, size: 96),
+                    GestureDetector(
+                      onTap: () => _changePhoto(context, ref),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: theme.colorScheme.outlineVariant,
+                                width: 2,
+                              ),
+                            ),
+                            child: const UserAvatar(size: 96),
+                          ),
+                          Positioned(
+                            bottom: 2,
+                            right: 2,
+                            child: CircleAvatar(
+                              radius: 16,
+                              backgroundColor: theme.colorScheme.primary,
+                              child: Icon(
+                                Icons.photo_camera_outlined,
+                                size: 17,
+                                color: theme.colorScheme.onPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -119,6 +140,28 @@ class ProfileScreen extends ConsumerWidget {
         },
       ),
     );
+  }
+
+  Future<void> _changePhoto(BuildContext context, WidgetRef ref) async {
+    Haptics.light();
+    try {
+      final saved = await pickAndSaveAvatar(ref.read(secureStoreProvider));
+      if (!saved) return;
+      ref.invalidate(avatarFileProvider);
+      Haptics.success();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile photo updated')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Haptics.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e).message)),
+        );
+      }
+    }
   }
 
   Future<void> _editName(

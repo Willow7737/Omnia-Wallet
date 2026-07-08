@@ -94,6 +94,13 @@ class SecureStore {
   Future<void> saveLastSeenNews(String id) async =>
       _storage.write(key: AppConfig.kLastSeenNewsKey, value: id);
 
+  /// Local file path of the user's chosen profile photo.
+  Future<String?> readAvatarPath() async =>
+      _storage.read(key: AppConfig.kAvatarPathKey);
+
+  Future<void> saveAvatarPath(String path) async =>
+      _storage.write(key: AppConfig.kAvatarPathKey, value: path);
+
   /// Irreversibly wipe all wallet material from the device.
   Future<void> wipe() async {
     await _storage.delete(key: AppConfig.kSeedKey);
@@ -105,5 +112,6 @@ class SecureStore {
     await _storage.delete(key: AppConfig.kSupabaseDidKey);
     await _storage.delete(key: AppConfig.kNoticesKey);
     await _storage.delete(key: AppConfig.kLastSeenNewsKey);
+    await _storage.delete(key: AppConfig.kAvatarPathKey);
   }
 }
