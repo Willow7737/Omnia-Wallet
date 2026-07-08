@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 
 import '../core/config.dart';
@@ -12,6 +14,7 @@ class NewsPost {
     required this.author,
     required this.createdAt,
     required this.replyCount,
+    this.imageUrl,
   });
 
   final String id;
@@ -21,6 +24,7 @@ class NewsPost {
   final String author;
   final DateTime createdAt;
   final int replyCount;
+  final String? imageUrl;
 
   factory NewsPost.fromJson(Map<String, dynamic> json) {
     // PostgREST embeds the reply count as `news_replies: [{count: n}]`.
@@ -41,6 +45,7 @@ class NewsPost {
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.fromMillisecondsSinceEpoch(0),
       replyCount: count,
+      imageUrl: json['image_url'] as String?,
     );
   }
 }
@@ -54,6 +59,9 @@ class NewsReply {
     required this.authorDid,
     required this.body,
     required this.createdAt,
+    this.userId,
+    this.parentId,
+    this.imageUrl,
   });
 
   final String id;
@@ -63,6 +71,15 @@ class NewsReply {
   final String body;
   final DateTime createdAt;
 
+  /// The Supabase user that wrote it — lets the client offer edit/delete
+  /// on the author's own replies (RLS enforces it server-side regardless).
+  final String? userId;
+
+  /// Set when this reply answers another reply (one-level threading).
+  final String? parentId;
+
+  final String? imageUrl;
+
   factory NewsReply.fromJson(Map<String, dynamic> json) => NewsReply(
         id: json['id'] as String? ?? '',
         postId: json['post_id'] as String? ?? '',
@@ -71,18 +88,22 @@ class NewsReply {
         body: json['body'] as String? ?? '',
         createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
             DateTime.fromMillisecondsSinceEpoch(0),
+        userId: json['user_id'] as String?,
+        parentId: json['parent_id'] as String?,
+        imageUrl: json['image_url'] as String?,
       );
 }
 
 /// Reads news through Supabase's PostgREST API with the public anon key —
-/// works in both auth modes, no session needed. Posting a reply requires a
-/// signed-in Supabase user's access token (RLS enforces it).
+/// works in both auth modes, no session needed. Writing (replies, media
+/// uploads, edits, deletes) requires a signed-in Supabase user's access
+/// token; RLS enforces ownership server-side.
 class NewsRepository {
   NewsRepository({String? supabaseUrl, String? anonKey, Dio? dio})
       : _dio = dio ??
             Dio(BaseOptions(
               connectTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 15),
+              receiveTimeout: const Duration(seconds: 20),
             )),
         _baseUrl = _normalize(supabaseUrl ?? AppConfig.supabaseUrl),
         _anonKey = anonKey ?? AppConfig.supabaseAnonKey;
@@ -139,6 +160,8 @@ class NewsRepository {
     required String body,
     required String authorName,
     String? authorDid,
+    String? parentId,
+    String? imageUrl,
     required String accessToken,
   }) async {
     final res = await _dio.post<List<dynamic>>(
@@ -148,6 +171,8 @@ class NewsRepository {
         'body': body,
         'author_name': authorName,
         if (authorDid != null) 'author_did': authorDid,
+        if (parentId != null) 'parent_id': parentId,
+        if (imageUrl != null) 'image_url': imageUrl,
       },
       options: Options(headers: {
         ..._headers(accessToken: accessToken),
@@ -159,5 +184,54 @@ class NewsRepository {
       throw StateError('Reply was not saved');
     }
     return NewsReply.fromJson(rows.first);
+  }
+
+  /// Edit one's own reply (RLS restricts to the author).
+  Future<void> updateReply({
+    required String replyId,
+    required String body,
+    required String accessToken,
+  }) async {
+    await _dio.patch<void>(
+      '$_baseUrl/rest/v1/news_replies',
+      queryParameters: {'id': 'eq.$replyId'},
+      data: {'body': body},
+      options: Options(headers: _headers(accessToken: accessToken)),
+    );
+  }
+
+  /// Delete one's own reply (children cascade server-side).
+  Future<void> deleteReply({
+    required String replyId,
+    required String accessToken,
+  }) async {
+    await _dio.delete<void>(
+      '$_baseUrl/rest/v1/news_replies',
+      queryParameters: {'id': 'eq.$replyId'},
+      options: Options(headers: _headers(accessToken: accessToken)),
+    );
+  }
+
+  /// Upload an image to the public `news-media` bucket and return its
+  /// public URL. Requires a signed-in user (bucket policy).
+  Future<String> uploadImage({
+    required Uint8List bytes,
+    required String fileName,
+    required String contentType,
+    required String accessToken,
+  }) async {
+    final path = 'replies/${DateTime.now().millisecondsSinceEpoch}-$fileName';
+    await _dio.post<void>(
+      '$_baseUrl/storage/v1/object/news-media/$path',
+      // A single-chunk stream keeps Dio from JSON-encoding the bytes.
+      data: Stream.fromIterable([bytes]),
+      options: Options(headers: {
+        'apikey': _anonKey,
+        'authorization': 'Bearer $accessToken',
+        'content-type': contentType,
+        'content-length': bytes.length.toString(),
+      }),
+    );
+    return '$_baseUrl/storage/v1/object/public/news-media/$path';
   }
 }

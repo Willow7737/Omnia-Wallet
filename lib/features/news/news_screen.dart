@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -68,6 +69,53 @@ class NewsScreen extends ConsumerWidget {
   }
 }
 
+/// A rounded network image with graceful loading/error states, used for
+/// post images and reply attachments.
+class NewsImage extends StatelessWidget {
+  const NewsImage({super.key, required this.url, this.maxHeight = 280});
+
+  final String url;
+  final double maxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Image.network(
+          url,
+          width: double.infinity,
+          fit: BoxFit.cover,
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Container(
+              height: 160,
+              color: scheme.surfaceContainerHighest,
+              child: const Center(
+                child: SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            );
+          },
+          errorBuilder: (_, __, ___) => Container(
+            height: 120,
+            color: scheme.surfaceContainerHighest,
+            child: Center(
+              child: Icon(Icons.broken_image_outlined,
+                  color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Tumblr-style post card. Set [full] on the detail screen to show the whole
 /// body; the feed clamps it.
 class NewsPostCard extends ConsumerWidget {
@@ -123,8 +171,44 @@ class NewsPostCard extends ConsumerWidget {
                         ?.copyWith(color: scheme.onSurfaceVariant),
                   ),
                   const Spacer(),
-                  Icon(Icons.more_horiz,
-                      size: 20, color: scheme.onSurfaceVariant),
+                  PopupMenuButton<String>(
+                    tooltip: 'More',
+                    icon: Icon(Icons.more_horiz,
+                        size: 20, color: scheme.onSurfaceVariant),
+                    onSelected: (action) {
+                      Haptics.selection();
+                      switch (action) {
+                        case 'copy':
+                          Clipboard.setData(ClipboardData(
+                              text: '${post.title}\n\n${post.body}'));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Post copied')),
+                          );
+                        case 'refresh':
+                          ref.invalidate(newsPostsProvider);
+                      }
+                    },
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'copy',
+                        child: ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.copy, size: 20),
+                          title: Text('Copy text'),
+                        ),
+                      ),
+                      PopupMenuItem(
+                        value: 'refresh',
+                        child: ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.refresh, size: 20),
+                          title: Text('Refresh feed'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -141,6 +225,10 @@ class NewsPostCard extends ConsumerWidget {
                 overflow: full ? null : TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
               ),
+              if (post.imageUrl != null) ...[
+                const SizedBox(height: 12),
+                NewsImage(url: post.imageUrl!),
+              ],
               if (post.tags.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 // Tumblr tags: lowercase, muted, hash-prefixed.

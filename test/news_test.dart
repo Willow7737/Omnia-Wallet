@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -87,6 +89,70 @@ void main() {
       expect(sent?.headers?['apikey'], 'anon-key');
       // Reads authenticate as anon.
       expect(sent?.headers?['authorization'], 'Bearer anon-key');
+    });
+
+    test('updateReply PATCHes the row with the author token', () async {
+      Options? sent;
+      Map<String, dynamic>? params;
+      when(() => dio.patch<void>(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          )).thenAnswer((inv) async {
+        params = inv.namedArguments[#queryParameters] as Map<String, dynamic>?;
+        sent = inv.namedArguments[#options] as Options?;
+        return Response(requestOptions: _req(), statusCode: 204);
+      });
+
+      await repo.updateReply(
+          replyId: 'r1', body: 'edited', accessToken: 'user-token');
+      expect(params?['id'], 'eq.r1');
+      expect(sent?.headers?['authorization'], 'Bearer user-token');
+    });
+
+    test('deleteReply targets the row id', () async {
+      Map<String, dynamic>? params;
+      when(() => dio.delete<void>(
+            any(),
+            queryParameters: any(named: 'queryParameters'),
+            options: any(named: 'options'),
+          )).thenAnswer((inv) async {
+        params = inv.namedArguments[#queryParameters] as Map<String, dynamic>?;
+        return Response(requestOptions: _req(), statusCode: 204);
+      });
+
+      await repo.deleteReply(replyId: 'r2', accessToken: 'user-token');
+      expect(params?['id'], 'eq.r2');
+    });
+
+    test(
+        'uploadImage streams bytes to the news-media bucket and returns '
+        'the public URL', () async {
+      String? url;
+      Options? sent;
+      when(() => dio.post<void>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          )).thenAnswer((inv) async {
+        url = inv.positionalArguments.first as String;
+        sent = inv.namedArguments[#options] as Options?;
+        return Response(requestOptions: _req(), statusCode: 200);
+      });
+
+      final publicUrl = await repo.uploadImage(
+        bytes: Uint8List.fromList([1, 2, 3]),
+        fileName: 'pic.jpg',
+        contentType: 'image/jpeg',
+        accessToken: 'user-token',
+      );
+      expect(url, contains('/storage/v1/object/news-media/replies/'));
+      expect(
+          publicUrl, contains('/storage/v1/object/public/news-media/replies/'));
+      expect(sent?.headers?['authorization'], 'Bearer user-token');
+      expect(sent?.headers?['content-type'], 'image/jpeg');
+      expect(sent?.headers?['content-length'], '3');
     });
 
     test('addReply posts with the user access token and returns the row',

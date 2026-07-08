@@ -31,6 +31,12 @@ class FakeGateway implements SupabaseGateway {
   String? get userEmail => 'user@example.com';
 
   @override
+  String? get userId => 'uid-1';
+
+  @override
+  String? get userName => 'Willow';
+
+  @override
   Future<String> accessToken() async {
     tokenCalls++;
     return token;

@@ -45,6 +45,10 @@ dependencies:
   # Vector brand art & illustrations
   flutter_svg: ^2.0.17
 
+  # Attach images to news replies; pick a profile photo
+  image_picker: ^1.1.2
+  path_provider: ^2.1.4
+
   # Formatting
   intl: ^0.19.0
 
