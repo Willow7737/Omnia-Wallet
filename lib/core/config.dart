@@ -56,6 +56,7 @@ class AppConfig {
   static const String kDisplayNameKey = 'omnia.wallet.display_name';
   static const String kAuthModeKey = 'omnia.wallet.auth_mode';
   static const String kSupabaseDidKey = 'omnia.wallet.supabase_did';
+  static const String kNoticesKey = 'omnia.wallet.notices';
 
   /// Refresh the JWT this many seconds before it actually expires.
   static const int jwtRefreshSkewSecs = 60;
