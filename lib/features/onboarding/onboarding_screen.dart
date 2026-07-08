@@ -170,28 +170,32 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             },
             itemBuilder: (context, i) {
               final slide = _slides[i];
+              // Bluesky-style: illustration up top, then a large
+              // left-aligned heading and body.
               return Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    SvgPicture.asset(slide.asset, height: 250),
-                    const SizedBox(height: 32),
+                    Center(child: SvgPicture.asset(slide.asset, height: 240)),
+                    const SizedBox(height: 36),
                     Text(
                       slide.title,
-                      textAlign: TextAlign.center,
                       style: theme.textTheme.headlineMedium?.copyWith(
+                        fontSize: 32,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
+                        letterSpacing: -0.6,
+                        height: 1.1,
                       ),
                     ),
                     const SizedBox(height: 12),
                     Text(
                       slide.body,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyLarge
-                          ?.copyWith(color: scheme.onSurfaceVariant),
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.45,
+                      ),
                     ),
                   ],
                 ),
@@ -199,29 +203,39 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             },
           ),
         ),
-        // Page dots.
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var i = 0; i < _slides.length; i++)
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: i == _index ? 26 : 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: i == _index ? scheme.primary : scheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-          ],
-        ),
+        // Bottom control row: dots on the left, a compact pill button on
+        // the right (Bluesky-style) instead of a full-width slab.
         Padding(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
-          child: FilledButton(
-            onPressed: _next,
-            child: Text(isLast ? 'Get started' : 'Next'),
+          padding: const EdgeInsets.fromLTRB(28, 8, 24, 20),
+          child: Row(
+            children: [
+              for (var i = 0; i < _slides.length; i++)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                  margin: const EdgeInsets.only(right: 7),
+                  width: i == _index ? 22 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: i == _index ? scheme.primary : scheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              const Spacer(),
+              FilledButton(
+                onPressed: _next,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 46),
+                  padding: const EdgeInsets.symmetric(horizontal: 28),
+                  shape: const StadiumBorder(),
+                  textStyle: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                child: Text(isLast ? 'Get started' : 'Next'),
+              ),
+            ],
           ),
         ),
       ],
