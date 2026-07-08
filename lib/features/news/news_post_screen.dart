@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/auth_mode.dart';
 import '../../core/brand/identicon.dart';
@@ -13,7 +16,8 @@ import 'news_screen.dart';
 
 /// A single post with its conversation. Replies follow Threads' anatomy:
 /// avatar column with a thin connector line stitching the thread together,
-/// name + relative time on the top row, body underneath.
+/// name + relative time on the top row, body underneath. Replies can be
+/// answered (one nesting level), and authors can edit/delete their own.
 class NewsPostScreen extends ConsumerStatefulWidget {
   const NewsPostScreen({super.key, required this.post});
 
@@ -27,33 +31,95 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
   final _replyController = TextEditingController();
   bool _sending = false;
 
+  /// Reply being answered (Threads-style "Replying to …" chip).
+  NewsReply? _replyTo;
+
+  /// Image attached to the pending reply.
+  Uint8List? _imageBytes;
+  String? _imageName;
+  String? _imageMime;
+
   @override
   void dispose() {
     _replyController.dispose();
     super.dispose();
   }
 
+  /// The name shown on this user's replies: local display name first, then
+  /// the Supabase account's username (GitHub user_name / Google name),
+  /// then the email prefix.
+  String _authorName() {
+    final displayName = ref.read(displayNameProvider).valueOrNull;
+    if (displayName != null && displayName.isNotEmpty) return displayName;
+    final gateway = ref.read(supabaseGatewayProvider);
+    return gateway.userName ??
+        gateway.userEmail?.split('@').first ??
+        'omnia user';
+  }
+
+  Future<void> _pickImage() async {
+    Haptics.light();
+    try {
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1600,
+        imageQuality: 82,
+      );
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      setState(() {
+        _imageBytes = bytes;
+        _imageName = picked.name;
+        _imageMime = picked.mimeType ?? 'image/jpeg';
+      });
+      Haptics.selection();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e).message)),
+        );
+      }
+    }
+  }
+
   Future<void> _sendReply() async {
     final body = _replyController.text.trim();
-    if (body.isEmpty) return;
+    if (body.isEmpty && _imageBytes == null) return;
     Haptics.medium();
     setState(() => _sending = true);
     try {
       final gateway = ref.read(supabaseGatewayProvider);
       final token = await gateway.accessToken();
-      final displayName = ref.read(displayNameProvider).valueOrNull;
+      final repo = ref.read(newsRepositoryProvider);
+
+      String? imageUrl;
+      final bytes = _imageBytes;
+      if (bytes != null) {
+        imageUrl = await repo.uploadImage(
+          bytes: bytes,
+          fileName: _imageName ?? 'image.jpg',
+          contentType: _imageMime ?? 'image/jpeg',
+          accessToken: token,
+        );
+      }
+
       final identity = ref.read(identityProvider).valueOrNull;
-      final name = (displayName != null && displayName.isNotEmpty)
-          ? displayName
-          : (gateway.userEmail?.split('@').first ?? 'omnia user');
-      await ref.read(newsRepositoryProvider).addReply(
-            postId: widget.post.id,
-            body: body,
-            authorName: name,
-            authorDid: identity?.did,
-            accessToken: token,
-          );
+      await repo.addReply(
+        postId: widget.post.id,
+        body: body.isEmpty ? '📷' : body,
+        authorName: _authorName(),
+        authorDid: identity?.did,
+        parentId: _replyTo?.id,
+        imageUrl: imageUrl,
+        accessToken: token,
+      );
       _replyController.clear();
+      setState(() {
+        _replyTo = null;
+        _imageBytes = null;
+        _imageName = null;
+        _imageMime = null;
+      });
       ref.invalidate(newsRepliesProvider(widget.post.id));
       ref.invalidate(newsPostsProvider);
       if (mounted) Haptics.success();
@@ -69,13 +135,106 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
     }
   }
 
+  Future<void> _editReply(NewsReply reply) async {
+    final controller = TextEditingController(text: reply.body);
+    final newBody = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Edit reply'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 4,
+          maxLength: 2000,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (newBody == null || newBody.isEmpty || newBody == reply.body) return;
+    try {
+      final token = await ref.read(supabaseGatewayProvider).accessToken();
+      await ref.read(newsRepositoryProvider).updateReply(
+            replyId: reply.id,
+            body: newBody,
+            accessToken: token,
+          );
+      ref.invalidate(newsRepliesProvider(widget.post.id));
+      Haptics.success();
+    } catch (e) {
+      if (mounted) {
+        Haptics.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e).message)),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteReply(NewsReply reply) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete reply?'),
+        content: const Text('This removes your reply for everyone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final token = await ref.read(supabaseGatewayProvider).accessToken();
+      await ref.read(newsRepositoryProvider).deleteReply(
+            replyId: reply.id,
+            accessToken: token,
+          );
+      ref.invalidate(newsRepliesProvider(widget.post.id));
+      ref.invalidate(newsPostsProvider);
+      Haptics.success();
+    } catch (e) {
+      if (mounted) {
+        Haptics.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e).message)),
+        );
+      }
+    }
+  }
+
+  void _startReplyTo(NewsReply reply) {
+    Haptics.selection();
+    setState(() {
+      // One nesting level: answering a child threads under its parent.
+      _replyTo = reply;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final repliesAsync = ref.watch(newsRepliesProvider(widget.post.id));
     final mode =
         ref.watch(authModeProvider).valueOrNull ?? AuthMode.selfCustody;
-    final canReply = mode == AuthMode.supabase &&
-        ref.watch(supabaseGatewayProvider).isSignedIn;
+    final gateway = ref.watch(supabaseGatewayProvider);
+    final canReply = mode == AuthMode.supabase && gateway.isSignedIn;
+    final myUserId = gateway.isAvailable ? gateway.userId : null;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -122,14 +281,13 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
                           ),
                         );
                       }
-                      return Column(
-                        children: [
-                          for (var i = 0; i < replies.length; i++)
-                            _ReplyRow(
-                              reply: replies[i],
-                              isLast: i == replies.length - 1,
-                            ),
-                        ],
+                      return _ThreadedReplies(
+                        replies: replies,
+                        myUserId: myUserId,
+                        canInteract: canReply,
+                        onReply: _startReplyTo,
+                        onEdit: _editReply,
+                        onDelete: _deleteReply,
                       );
                     },
                   ),
@@ -141,41 +299,21 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
           SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
               child: canReply
-                  ? Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _replyController,
-                            enabled: !_sending,
-                            textCapitalization: TextCapitalization.sentences,
-                            maxLength: 2000,
-                            buildCounter: (_,
-                                    {required currentLength,
-                                    required isFocused,
-                                    maxLength}) =>
-                                null,
-                            decoration: const InputDecoration(
-                              hintText: 'Reply to omnia…',
-                              isDense: true,
-                            ),
-                            onSubmitted: (_) => _sendReply(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton.filled(
-                          onPressed: _sending ? null : _sendReply,
-                          icon: _sending
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child:
-                                      CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Icon(Icons.arrow_upward),
-                        ),
-                      ],
+                  ? _Composer(
+                      controller: _replyController,
+                      sending: _sending,
+                      replyTo: _replyTo,
+                      imageBytes: _imageBytes,
+                      onPickImage: _pickImage,
+                      onClearImage: () => setState(() {
+                        _imageBytes = null;
+                        _imageName = null;
+                        _imageMime = null;
+                      }),
+                      onCancelReplyTo: () => setState(() => _replyTo = null),
+                      onSend: _sendReply,
                     )
                   : Container(
                       padding: const EdgeInsets.all(12),
@@ -208,13 +346,225 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
   }
 }
 
+/// The reply composer: optional "Replying to" chip, optional image preview,
+/// text field with attach + send.
+class _Composer extends StatelessWidget {
+  const _Composer({
+    required this.controller,
+    required this.sending,
+    required this.replyTo,
+    required this.imageBytes,
+    required this.onPickImage,
+    required this.onClearImage,
+    required this.onCancelReplyTo,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final bool sending;
+  final NewsReply? replyTo;
+  final Uint8List? imageBytes;
+  final VoidCallback onPickImage;
+  final VoidCallback onClearImage;
+  final VoidCallback onCancelReplyTo;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (replyTo != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(
+              children: [
+                Icon(Icons.subdirectory_arrow_right,
+                    size: 16, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Replying to ${replyTo!.authorName}',
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium
+                        ?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                ),
+                InkWell(
+                  onTap: onCancelReplyTo,
+                  child: Icon(Icons.close,
+                      size: 16, color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+        if (imageBytes != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.memory(
+                    imageBytes!,
+                    height: 84,
+                    width: 84,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Positioned(
+                  top: 2,
+                  left: 62,
+                  child: InkWell(
+                    onTap: onClearImage,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: scheme.surface.withValues(alpha: 0.9),
+                        shape: BoxShape.circle,
+                      ),
+                      padding: const EdgeInsets.all(2),
+                      child: const Icon(Icons.close, size: 14),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        Row(
+          children: [
+            IconButton(
+              tooltip: 'Attach image',
+              onPressed: sending ? null : onPickImage,
+              icon: const Icon(Icons.image_outlined),
+            ),
+            Expanded(
+              child: TextField(
+                controller: controller,
+                enabled: !sending,
+                textCapitalization: TextCapitalization.sentences,
+                maxLength: 2000,
+                buildCounter: (_,
+                        {required currentLength,
+                        required isFocused,
+                        maxLength}) =>
+                    null,
+                decoration: const InputDecoration(
+                  hintText: 'Reply to omnia…',
+                  isDense: true,
+                ),
+                onSubmitted: (_) => onSend(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton.filled(
+              onPressed: sending ? null : onSend,
+              icon: sending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.arrow_upward),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Renders the reply list with one level of nesting: top-level replies in
+/// order, children indented beneath their parent.
+class _ThreadedReplies extends StatelessWidget {
+  const _ThreadedReplies({
+    required this.replies,
+    required this.myUserId,
+    required this.canInteract,
+    required this.onReply,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final List<NewsReply> replies;
+  final String? myUserId;
+  final bool canInteract;
+  final void Function(NewsReply) onReply;
+  final void Function(NewsReply) onEdit;
+  final void Function(NewsReply) onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final byParent = <String, List<NewsReply>>{};
+    final topLevel = <NewsReply>[];
+    final ids = {for (final r in replies) r.id};
+    for (final r in replies) {
+      // Treat orphans (parent deleted) as top-level.
+      if (r.parentId != null && ids.contains(r.parentId)) {
+        byParent.putIfAbsent(r.parentId!, () => []).add(r);
+      } else {
+        topLevel.add(r);
+      }
+    }
+
+    final rows = <Widget>[];
+    for (var i = 0; i < topLevel.length; i++) {
+      final parent = topLevel[i];
+      final children = byParent[parent.id] ?? const <NewsReply>[];
+      final parentIsLast = i == topLevel.length - 1 && children.isEmpty;
+      rows.add(_ReplyRow(
+        reply: parent,
+        isLast: parentIsLast,
+        isMine: myUserId != null && parent.userId == myUserId,
+        canInteract: canInteract,
+        onReply: onReply,
+        onEdit: onEdit,
+        onDelete: onDelete,
+      ));
+      for (var j = 0; j < children.length; j++) {
+        rows.add(Padding(
+          padding: const EdgeInsets.only(left: 40),
+          child: _ReplyRow(
+            reply: children[j],
+            isLast: i == topLevel.length - 1 && j == children.length - 1,
+            isMine: myUserId != null && children[j].userId == myUserId,
+            canInteract: canInteract,
+            onReply: onReply,
+            onEdit: onEdit,
+            onDelete: onDelete,
+            nested: true,
+          ),
+        ));
+      }
+    }
+    return Column(children: rows);
+  }
+}
+
 /// One Threads-style reply row: avatar + connector line on the left,
-/// name/time/body on the right.
+/// name/time/body on the right, small action row underneath.
 class _ReplyRow extends StatelessWidget {
-  const _ReplyRow({required this.reply, required this.isLast});
+  const _ReplyRow({
+    required this.reply,
+    required this.isLast,
+    required this.isMine,
+    required this.canInteract,
+    required this.onReply,
+    required this.onEdit,
+    required this.onDelete,
+    this.nested = false,
+  });
 
   final NewsReply reply;
   final bool isLast;
+  final bool isMine;
+  final bool canInteract;
+  final bool nested;
+  final void Function(NewsReply) onReply;
+  final void Function(NewsReply) onEdit;
+  final void Function(NewsReply) onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -231,7 +581,7 @@ class _ReplyRow extends StatelessWidget {
               ClipOval(
                 child: Identicon(
                   seed: reply.authorDid ?? reply.authorName,
-                  size: 34,
+                  size: nested ? 28 : 34,
                 ),
               ),
               if (!isLast)
@@ -247,7 +597,7 @@ class _ReplyRow extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 4 : 20),
+              padding: EdgeInsets.only(bottom: isLast ? 4 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -267,6 +617,27 @@ class _ReplyRow extends StatelessWidget {
                         style: theme.textTheme.labelSmall
                             ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
+                      if (isMine)
+                        PopupMenuButton<String>(
+                          tooltip: 'More',
+                          padding: EdgeInsets.zero,
+                          iconSize: 18,
+                          icon: Icon(Icons.more_horiz,
+                              color: scheme.onSurfaceVariant),
+                          onSelected: (action) {
+                            switch (action) {
+                              case 'edit':
+                                onEdit(reply);
+                              case 'delete':
+                                onDelete(reply);
+                            }
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: 'edit', child: Text('Edit')),
+                            PopupMenuItem(
+                                value: 'delete', child: Text('Delete')),
+                          ],
+                        ),
                     ],
                   ),
                   const SizedBox(height: 3),
@@ -274,6 +645,26 @@ class _ReplyRow extends StatelessWidget {
                     reply.body,
                     style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
                   ),
+                  if (reply.imageUrl != null) ...[
+                    const SizedBox(height: 8),
+                    NewsImage(url: reply.imageUrl!, maxHeight: 220),
+                  ],
+                  if (canInteract && !nested) ...[
+                    const SizedBox(height: 2),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          minimumSize: const Size(0, 30),
+                          foregroundColor: scheme.onSurfaceVariant,
+                        ),
+                        onPressed: () => onReply(reply),
+                        icon: const Icon(Icons.chat_bubble_outline, size: 15),
+                        label: const Text('Reply'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

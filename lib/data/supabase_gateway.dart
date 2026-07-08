@@ -17,6 +17,13 @@ abstract class SupabaseGateway {
 
   String? get userEmail;
 
+  /// The signed-in Supabase user's id (`auth.uid()`), or null.
+  String? get userId;
+
+  /// Best available username from the account's metadata — GitHub gives
+  /// `user_name`/`preferred_username`, Google gives `name`/`full_name`.
+  String? get userName;
+
   /// A valid Supabase access token, refreshing the session if needed.
   /// Throws [StateError] when not signed in.
   Future<String> accessToken();
@@ -75,6 +82,26 @@ class SupabaseFlutterGateway implements SupabaseGateway {
   @override
   String? get userEmail =>
       _initialized ? _client.auth.currentUser?.email : null;
+
+  @override
+  String? get userId => _initialized ? _client.auth.currentUser?.id : null;
+
+  @override
+  String? get userName {
+    if (!_initialized) return null;
+    final meta = _client.auth.currentUser?.userMetadata;
+    if (meta == null) return null;
+    for (final key in [
+      'user_name',
+      'preferred_username',
+      'name',
+      'full_name',
+    ]) {
+      final value = meta[key];
+      if (value is String && value.trim().isNotEmpty) return value.trim();
+    }
+    return null;
+  }
 
   @override
   Future<String> accessToken() async {

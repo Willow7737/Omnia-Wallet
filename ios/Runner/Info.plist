@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Attach a photo to your reply or set a profile picture.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan a recipient's Omnia DID QR code.</string>
 	<key>NSFaceIDUsageDescription</key>
