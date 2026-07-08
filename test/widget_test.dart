@@ -21,15 +21,27 @@ void main() {
     });
   });
 
-  testWidgets('Onboarding renders create/import actions', (tester) async {
+  testWidgets('Onboarding shows slides, then methods after Skip',
+      (tester) async {
     await tester.pumpWidget(
       const ProviderScope(
         child: MaterialApp(home: OnboardingScreen()),
       ),
     );
-    // Advance past the staggered FadeSlideIn entrance delays/animations so no
-    // timers remain pending at the end of the test.
-    await tester.pump(const Duration(milliseconds: 600));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Phase 1: slides with Skip + Next.
+    expect(find.text('Skip'), findsOneWidget);
+    expect(find.text('Next'), findsOneWidget);
+    expect(find.text('Meet your Omnia wallet'), findsOneWidget);
+
+    // Skip jumps straight to the method cards.
+    await tester.tap(find.text('Skip'));
+    // First pump builds the methods phase (scheduling the staggered
+    // FadeSlideIn timers); the second elapses past them so no timers remain
+    // pending at the end of the test.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
 
     expect(find.text('Create a new wallet'), findsOneWidget);
     expect(find.text('Import from recovery phrase'), findsOneWidget);

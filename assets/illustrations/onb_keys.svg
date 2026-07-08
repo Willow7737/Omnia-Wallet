@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 260">
+  <!-- Scrapbook collage: heirloom key + DID tag. Self-custody slide. -->
+  <rect x="8" y="8" width="304" height="244" rx="28" fill="#F1EBDD"/>
+  <rect x="8" y="8" width="304" height="244" rx="28" fill="none" stroke="#E2D8C0" stroke-width="2"/>
+
+  <path d="M270 46 l3.5 9 9 3.5 -9 3.5 -3.5 9 -3.5 -9 -9 -3.5 9 -3.5 z" fill="#7C5230"/>
+  <path d="M48 90 l2.5 6.5 6.5 2.5 -6.5 2.5 -2.5 6.5 -2.5 -6.5 -6.5 -2.5 6.5 -2.5 z" fill="#C4858F"/>
+  <path d="M282 190 l2.5 6.5 6.5 2.5 -6.5 2.5 -2.5 6.5 -2.5 -6.5 -6.5 -2.5 6.5 -2.5 z" fill="#8A9A5B"/>
+  <circle cx="70" cy="228" r="3" fill="#C9A44C"/>
+  <circle cx="240" cy="30" r="3" fill="#C4858F"/>
+
+  <!-- heirloom key, rotated -->
+  <g transform="rotate(-28 150 140)">
+    <circle cx="96" cy="140" r="30" fill="none" stroke="#7C5230" stroke-width="12"/>
+    <circle cx="96" cy="140" r="9" fill="#D9A0A6"/>
+    <rect x="126" y="133" width="118" height="14" rx="7" fill="#7C5230"/>
+    <rect x="216" y="145" width="12" height="22" rx="4" fill="#7C5230"/>
+    <rect x="236" y="145" width="12" height="30" rx="4" fill="#7C5230"/>
+  </g>
+
+  <!-- paper tag with DID grid (QR-ish) -->
+  <g transform="rotate(8 232 172)">
+    <rect x="188" y="128" width="92" height="92" rx="12" fill="#FBF8F0" stroke="#8A9A5B" stroke-width="3"/>
+    <g fill="#6C7C3F">
+      <rect x="202" y="142" width="16" height="16" rx="3"/>
+      <rect x="250" y="142" width="16" height="16" rx="3"/>
+      <rect x="202" y="190" width="16" height="16" rx="3"/>
+      <rect x="226" y="166" width="16" height="16" rx="3"/>
+      <rect x="250" y="190" width="10" height="10" rx="2"/>
+      <rect x="228" y="144" width="10" height="10" rx="2"/>
+      <rect x="204" y="168" width="10" height="10" rx="2"/>
+      <rect x="256" y="170" width="10" height="10" rx="2"/>
+      <rect x="230" y="194" width="10" height="10" rx="2"/>
+    </g>
+    <!-- tag string hole -->
+    <circle cx="196" cy="136" r="4" fill="#C9A44C"/>
+  </g>
+
+  <!-- little leaf -->
+  <path d="M56 178 q22 -26 46 -18 q-10 30 -40 30 q-4 0 -6 -12 z" fill="#8A9A5B"/>
+  <path d="M60 186 q18 -16 38 -20" fill="none" stroke="#6C7C3F" stroke-width="2.5"/>
+</svg>

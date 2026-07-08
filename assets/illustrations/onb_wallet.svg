@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 260">
+  <!-- Scrapbook collage: wallet card + coins. Palette: cream/pink/moss/brown. -->
+  <rect x="8" y="8" width="304" height="244" rx="28" fill="#F1EBDD"/>
+  <rect x="8" y="8" width="304" height="244" rx="28" fill="none" stroke="#E2D8C0" stroke-width="2"/>
+
+  <!-- sparkle stars -->
+  <path d="M52 44 l3.5 9 9 3.5 -9 3.5 -3.5 9 -3.5 -9 -9 -3.5 9 -3.5 z" fill="#7C5230"/>
+  <path d="M268 60 l2.5 6.5 6.5 2.5 -6.5 2.5 -2.5 6.5 -2.5 -6.5 -6.5 -2.5 6.5 -2.5 z" fill="#7C5230"/>
+  <path d="M64 206 l2.5 6.5 6.5 2.5 -6.5 2.5 -2.5 6.5 -2.5 -6.5 -6.5 -2.5 6.5 -2.5 z" fill="#C4858F"/>
+  <path d="M256 196 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2 z" fill="#8A9A5B"/>
+  <circle cx="94" cy="36" r="3" fill="#C9A44C"/>
+  <circle cx="238" cy="228" r="3" fill="#C4858F"/>
+
+  <!-- wallet body -->
+  <g transform="rotate(-4 160 138)">
+    <rect x="84" y="92" width="152" height="100" rx="18" fill="#8A9A5B"/>
+    <rect x="84" y="92" width="152" height="100" rx="18" fill="none" stroke="#6C7C3F" stroke-width="3"/>
+    <rect x="84" y="112" width="152" height="18" fill="#6C7C3F"/>
+    <!-- clasp -->
+    <rect x="196" y="132" width="52" height="34" rx="12" fill="#F1EBDD" stroke="#6C7C3F" stroke-width="3"/>
+    <circle cx="222" cy="149" r="7" fill="#C9A44C"/>
+  </g>
+
+  <!-- coins -->
+  <circle cx="96" cy="182" r="26" fill="#C9A44C"/>
+  <circle cx="96" cy="182" r="26" fill="none" stroke="#A9863A" stroke-width="3"/>
+  <circle cx="96" cy="182" r="16" fill="none" stroke="#A9863A" stroke-width="2.5"/>
+  <circle cx="132" cy="204" r="18" fill="#D9A0A6"/>
+  <circle cx="132" cy="204" r="18" fill="none" stroke="#C4858F" stroke-width="3"/>
+  <circle cx="132" cy="204" r="10" fill="none" stroke="#C4858F" stroke-width="2.5"/>
+
+  <!-- petal flower tucked behind wallet corner -->
+  <g transform="translate(232 92)">
+    <ellipse cx="0" cy="-14" rx="8" ry="14" fill="#D9A0A6"/>
+    <ellipse cx="13" cy="-4" rx="8" ry="14" fill="#D9A0A6" transform="rotate(72)"/>
+    <ellipse cx="8" cy="12" rx="8" ry="14" fill="#D9A0A6" transform="rotate(144)"/>
+    <ellipse cx="-8" cy="12" rx="8" ry="14" fill="#D9A0A6" transform="rotate(216)"/>
+    <ellipse cx="-13" cy="-4" rx="8" ry="14" fill="#D9A0A6" transform="rotate(288)"/>
+    <circle cx="0" cy="0" r="7" fill="#C9A44C"/>
+  </g>
+</svg>
