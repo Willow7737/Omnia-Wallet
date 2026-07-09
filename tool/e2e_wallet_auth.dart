@@ -14,7 +14,8 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 
 Future<Map<String, dynamic>> _json(HttpClientResponse res) async =>
-    jsonDecode(await res.transform(utf8.decoder).join()) as Map<String, dynamic>;
+    jsonDecode(await res.transform(utf8.decoder).join())
+        as Map<String, dynamic>;
 
 Future<void> main(List<String> args) async {
   final base = args.isNotEmpty ? args.first : 'https://78.47.43.136.sslip.io';
@@ -47,8 +48,8 @@ Future<void> main(List<String> args) async {
   final chal = await post('/api/v1/auth/challenge', {'public_key': pubHex});
   stdout.writeln('challenge ok (nonce ${chal['nonce']})');
 
-  final sig = ed.sign(priv,
-      Uint8List.fromList(('omnia-auth:${chal['nonce']}').codeUnits));
+  final sig = ed.sign(
+      priv, Uint8List.fromList(('omnia-auth:${chal['nonce']}').codeUnits));
   final login = await post('/api/v1/auth/login', {
     'public_key': pubHex,
     'signature': hex.encode(sig),
@@ -59,8 +60,8 @@ Future<void> main(List<String> args) async {
   }
   stdout.writeln('login ok — JWT issued for $did');
 
-  final balReq = await client
-      .getUrl(Uri.parse('$base/api/v1/economics/balance/$did'));
+  final balReq =
+      await client.getUrl(Uri.parse('$base/api/v1/economics/balance/$did'));
   balReq.headers.set('authorization', 'Bearer ${login['token']}');
   final balRes = await balReq.close();
   final bal = await _json(balRes);
