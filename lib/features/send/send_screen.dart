@@ -8,6 +8,7 @@ import '../../core/auth_mode.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
+import '../../core/widgets/hud.dart';
 import '../../state/contacts.dart';
 import '../../state/notices.dart';
 import '../../state/providers.dart';
@@ -126,12 +127,18 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     if (proceed != true) return;
 
     if (!await _confirmWithBiometrics()) return;
+    if (!mounted) return;
 
     setState(() => _busy = true);
     try {
-      final result = await ref
-          .read(walletRepositoryProvider)
-          .send(toDid: toDid, amount: amount);
+      // Blocking HUD: dimmed screen + centered spinner square while the
+      // transfer is in flight.
+      final result = await runWithHud(
+        context,
+        () => ref
+            .read(walletRepositoryProvider)
+            .send(toDid: toDid, amount: amount),
+      );
       ref.invalidate(balanceProvider);
       ref.invalidate(historyProvider);
       ref.read(noticesProvider.notifier).add(

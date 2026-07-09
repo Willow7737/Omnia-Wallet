@@ -23,22 +23,24 @@ class OmniaColors extends ThemeExtension<OmniaColors> {
   final Color positive;
   final Color negative;
 
+  // Discord-inspired semantics: green for incoming/success, red for
+  // outgoing/spend — Send and Receive read differently at a glance.
   static const light = OmniaColors(
-    success: Color(0xFF15803D),
+    success: Color(0xFF23A55A),
     onSuccess: Colors.white,
-    successContainer: Color(0xFFDCFCE7),
-    warning: Color(0xFFB45309),
-    positive: Color(0xFF15803D),
-    negative: Color(0xFF0A0A0A),
+    successContainer: Color(0xFFD8F3E3),
+    warning: Color(0xFFF0B232),
+    positive: Color(0xFF23A55A),
+    negative: Color(0xFFDA373C),
   );
 
   static const dark = OmniaColors(
-    success: Color(0xFF4ADE80),
-    onSuccess: Color(0xFF052E16),
-    successContainer: Color(0xFF14532D),
-    warning: Color(0xFFFBBF24),
-    positive: Color(0xFF4ADE80),
-    negative: Color(0xFFE7E7E7),
+    success: Color(0xFF23A55A),
+    onSuccess: Colors.white,
+    successContainer: Color(0xFF1E3B2C),
+    warning: Color(0xFFF0B232),
+    positive: Color(0xFF3BA55D),
+    negative: Color(0xFFF23F43),
   );
 
   @override
@@ -79,14 +81,23 @@ extension OmniaThemeX on BuildContext {
   OmniaColors get omnia => Theme.of(this).extension<OmniaColors>()!;
 }
 
-/// Omnia design language: paper-white surfaces, near-black ink, one restrained
-/// blue — shared with omnia-web and omnia-protocol-interface.
+/// Omnia design language 2.0 — Discord-inspired: a blurple accent over
+/// calm layered neutrals, set entirely in Inter.
 class OmniaTheme {
   OmniaTheme._();
 
-  static const Color ink = Color(0xFF0A0A0A);
-  static const Color paper = Color(0xFFFAFAF8);
-  static const Color blue = Color(0xFF2563EB);
+  /// The accent ("blurple").
+  static const Color blue = Color(0xFF5865F2);
+
+  // Light neutrals (Discord light mode: white cards over cool grey).
+  static const Color ink = Color(0xFF313338);
+  static const Color paper = Color(0xFFF9F9FA);
+
+  // Dark neutrals, layered exactly like Discord: app bg -> card -> input.
+  static const Color darkBg = Color(0xFF1E1F22);
+  static const Color darkCard = Color(0xFF2B2D31);
+  static const Color darkInput = Color(0xFF383A40);
+  static const Color darkText = Color(0xFFDBDEE1);
 
   // Tabular figures keep balances and amounts from shifting width as they
   // animate/update.
@@ -100,6 +111,7 @@ class OmniaTheme {
       surface: paper,
       primary: blue,
       onSurface: ink,
+      surfaceContainerHighest: const Color(0xFFEBEDEF),
     );
     return _base(scheme, OmniaColors.light, Brightness.light);
   }
@@ -109,8 +121,11 @@ class OmniaTheme {
       seedColor: blue,
       brightness: Brightness.dark,
     ).copyWith(
-      surface: const Color(0xFF0B0B0C),
-      surfaceContainerHighest: const Color(0xFF1A1A1D),
+      surface: darkBg,
+      primary: blue,
+      onPrimary: Colors.white,
+      onSurface: darkText,
+      surfaceContainerHighest: darkCard,
     );
     return _base(scheme, OmniaColors.dark, Brightness.dark);
   }
@@ -120,8 +135,9 @@ class OmniaTheme {
     OmniaColors omnia,
     Brightness brightness,
   ) {
-    final base = ThemeData(brightness: brightness);
+    final base = ThemeData(brightness: brightness, fontFamily: 'Inter');
     final text = base.textTheme.apply(
+      fontFamily: 'Inter',
       bodyColor: scheme.onSurface,
       displayColor: scheme.onSurface,
     );

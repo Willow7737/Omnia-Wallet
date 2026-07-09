@@ -6,14 +6,19 @@ import 'press_scale.dart';
 class MethodCard extends StatelessWidget {
   const MethodCard({
     super.key,
-    required this.icon,
+    this.icon,
+    this.leading,
     required this.title,
     required this.subtitle,
     required this.primary,
     required this.onTap,
-  });
+  }) : assert(icon != null || leading != null,
+            'Provide an icon or a custom leading widget');
 
-  final IconData icon;
+  final IconData? icon;
+
+  /// Custom leading widget (e.g. a real brand logo image); wins over [icon].
+  final Widget? leading;
   final String title;
   final String subtitle;
   final bool primary;
@@ -40,7 +45,7 @@ class MethodCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: fg),
+            leading ?? Icon(icon, color: fg),
             const SizedBox(width: 14),
             Expanded(
               child: Column(

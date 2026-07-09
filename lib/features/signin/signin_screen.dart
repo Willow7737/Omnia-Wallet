@@ -166,7 +166,20 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 40),
                   child: MethodCard(
-                    icon: Icons.public,
+                    // The official "G" on a white chip so it reads correctly
+                    // on the primary-colored card.
+                    leading: Container(
+                      padding: const EdgeInsets.all(5),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Image.asset(
+                        'assets/brand_icons/google_g.png',
+                        width: 20,
+                        height: 20,
+                      ),
+                    ),
                     title: 'Continue with Google',
                     subtitle: 'Opens your browser to sign in',
                     primary: true,
@@ -177,7 +190,18 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 FadeSlideIn(
                   delay: const Duration(milliseconds: 80),
                   child: MethodCard(
-                    icon: Icons.code,
+                    // Official GitHub mark (solid) — tinted to match the
+                    // theme in dark mode.
+                    leading: Builder(builder: (context) {
+                      final dark =
+                          Theme.of(context).brightness == Brightness.dark;
+                      return Image.asset(
+                        'assets/brand_icons/github_mark.png',
+                        width: 26,
+                        height: 26,
+                        color: dark ? Colors.white : null,
+                      );
+                    }),
                     title: 'Continue with GitHub',
                     subtitle: 'Opens your browser to sign in',
                     primary: false,
