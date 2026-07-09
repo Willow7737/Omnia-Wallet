@@ -152,6 +152,15 @@ class AuthRepository {
     final minted = await mint.mint(accessToken);
     await _store.saveSupabaseDid(minted.did);
     _identity = WalletIdentity(did: minted.did, mode: AuthMode.supabase);
+
+    // Externally-minted JWTs skip the node's challenge/login path, which is
+    // what normally registers a DID — so register explicitly (idempotent).
+    // Best-effort: an unreachable/old node must not block sign-in; the
+    // balance screen will surface any problem.
+    try {
+      await _api.registerDid(minted.token);
+    } catch (_) {}
+
     return Session(
       did: minted.did,
       token: minted.token,

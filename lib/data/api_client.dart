@@ -62,6 +62,17 @@ class ApiClient {
     return LoginResponse.fromJson(res.data!);
   }
 
+  /// `POST /api/v1/auth/register` — registers the JWT's own DID in the
+  /// node's quota system (idempotent). Needed for externally-minted JWTs
+  /// (Supabase sign-in), which skip the challenge/login path that normally
+  /// registers a DID.
+  Future<void> registerDid(String token) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/api/v1/auth/register',
+      options: _auth(token),
+    );
+  }
+
   // ---- Economics (JWT) ----
 
   /// `GET /api/v1/economics/balance/:did`.

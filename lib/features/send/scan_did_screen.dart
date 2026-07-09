@@ -3,16 +3,18 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 
 /// Extract an Omnia DID from a scanned QR payload.
 ///
-/// Accepts either a bare `did:omnia:<32 hex>` string or a payload that
-/// contains one (e.g. a URI like `omnia:did:omnia:...` or with surrounding
-/// whitespace). Returns the normalized `did:omnia:...` string, or `null` if
-/// the payload doesn't contain a well-formed Omnia DID.
+/// Accepts a bare `did:omnia:<hex>` string or a payload that contains one
+/// (e.g. a URI like `omnia:did:omnia:...` or with surrounding whitespace).
+/// DID id lengths vary by origin — self-custody wallets derive 32 hex chars,
+/// web/Supabase accounts get 8 — so any 8–64 hex id is accepted. Returns the
+/// normalized `did:omnia:...` string, or `null` if the payload doesn't
+/// contain a well-formed Omnia DID.
 ///
 /// Kept as a pure top-level function so it can be unit-tested without a camera.
 String? parseScannedDid(String? raw) {
   if (raw == null) return null;
   final match = RegExp(
-    r'did:omnia:[0-9a-fA-F]{32}',
+    r'did:omnia:[0-9a-fA-F]{8,64}',
     caseSensitive: false,
   ).firstMatch(raw.trim());
   return match?.group(0)?.toLowerCase();
