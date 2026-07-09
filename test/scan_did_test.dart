@@ -24,8 +24,14 @@ void main() {
       );
     });
 
-    test('rejects a DID with the wrong length', () {
-      expect(parseScannedDid('did:omnia:deadbeef'), isNull);
+    test('accepts short web-account DIDs (8 hex)', () {
+      // Web/Supabase signups get did:omnia:<8 hex> — the QR scanner
+      // must recognize those too.
+      expect(parseScannedDid('did:omnia:933eaf87'), 'did:omnia:933eaf87');
+    });
+
+    test('rejects a DID with too short an id', () {
+      expect(parseScannedDid('did:omnia:dead'), isNull);
     });
 
     test('rejects non-omnia payloads', () {

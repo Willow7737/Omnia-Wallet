@@ -64,6 +64,7 @@ void main() {
   late MockStorage storage;
   late Map<String, String?> disk;
   late MockDio mintDio;
+  late MockDio apiDio;
   late FakeGateway gateway;
   late AuthRepository repo;
   int mintCalls = 0;
@@ -115,8 +116,17 @@ void main() {
     mintDio = MockDio();
     gateway = FakeGateway();
     // ApiClient's constructor assigns dio.options.baseUrl.
-    final apiDio = MockDio();
+    apiDio = MockDio();
     when(() => apiDio.options).thenReturn(BaseOptions());
+    // The post-mint DID registration call to the node.
+    when(() => apiDio.post<Map<String, dynamic>>(
+          any(),
+          options: any(named: 'options'),
+        )).thenAnswer((_) async => Response(
+          requestOptions: RequestOptions(path: '/api/v1/auth/register'),
+          statusCode: 200,
+          data: {'is_registered': true},
+        ));
     repo = AuthRepository(
       store: SecureStore(storage),
       api: ApiClient(baseUrl: 'http://node.invalid', dio: apiDio),
@@ -144,6 +154,34 @@ void main() {
       expect(identity?.did, 'did:omnia:11223344');
       expect(identity?.publicKeyHex, isNull);
       expect(identity?.mode, AuthMode.supabase);
+    });
+
+    test('sign-in registers the DID on the node with the minted JWT', () async {
+      stubMint();
+      await repo.completeSupabaseSignIn();
+
+      final captured = verify(() => apiDio.post<Map<String, dynamic>>(
+            captureAny(),
+            options: captureAny(named: 'options'),
+          )).captured;
+      expect(captured[0], '/api/v1/auth/register');
+      expect((captured[1] as Options).headers?['authorization'],
+          'Bearer node-jwt');
+    });
+
+    test('a failing node registration does not block sign-in', () async {
+      stubMint();
+      when(() => apiDio.post<Map<String, dynamic>>(
+            any(),
+            options: any(named: 'options'),
+          )).thenThrow(DioException(
+        requestOptions: RequestOptions(path: '/api/v1/auth/register'),
+        type: DioExceptionType.connectionError,
+      ));
+
+      final session = await repo.completeSupabaseSignIn();
+      expect(session.did, 'did:omnia:11223344');
+      expect(await repo.hasWallet(), isTrue);
     });
 
     test('ensureSession reuses the cached node JWT until it expires', () async {
