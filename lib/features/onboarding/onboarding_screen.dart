@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,25 +32,25 @@ class _Slide {
 
 const _slides = [
   _Slide(
-    asset: 'assets/illustrations/onb_wallet.svg',
+    asset: 'assets/onboarding/onb_wallet.jpg',
     title: 'Meet your Omnia wallet',
     body: 'Universal Basic Compute, in your pocket. Check your balance, '
         'follow your activity, and carry your identity everywhere.',
   ),
   _Slide(
-    asset: 'assets/illustrations/onb_keys.svg',
+    asset: 'assets/onboarding/onb_keys.jpg',
     title: 'Your keys, your DID',
     body: 'Create a self-custody wallet whose keys never leave this device — '
         'or sign in with the Omnia account you already use on the web.',
   ),
   _Slide(
-    asset: 'assets/illustrations/onb_send.svg',
+    asset: 'assets/onboarding/onb_send.jpg',
     title: 'Send. Vote. Take part.',
     body: 'Spend UBC in a couple of taps and have your say on governance '
         'proposals that steer the protocol.',
   ),
   _Slide(
-    asset: 'assets/illustrations/onb_news.svg',
+    asset: 'assets/onboarding/onb_news.jpg',
     title: 'Stay in the loop',
     body: 'Transaction alerts and news from the Omnia team keep you close to '
         'where the protocol is heading.',
@@ -131,11 +133,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: _showMethods ? _buildMethods(context) : _buildSlides(context),
-        ),
+      // No top SafeArea in the slides phase: the photo bleeds under the
+      // status bar to the very top edge of the screen.
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: _showMethods
+            ? SafeArea(child: _buildMethods(context))
+            : _buildSlides(context),
       ),
     );
   }
@@ -146,96 +150,154 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isLast = _index == _slides.length - 1;
+    final imageHeight = MediaQuery.sizeOf(context).height * 0.46;
 
-    return Column(
+    return Stack(
       key: const ValueKey('slides'),
       children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(0, 8, 12, 0),
-            child: TextButton(
-              onPressed: _toMethods,
-              child: const Text('Skip'),
+        Column(
+          children: [
+            Expanded(
+              child: PageView.builder(
+                controller: _pageController,
+                itemCount: _slides.length,
+                onPageChanged: (i) {
+                  Haptics.selection();
+                  setState(() => _index = i);
+                },
+                itemBuilder: (context, i) {
+                  final slide = _slides[i];
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Full-bleed photo from the top edge down to just
+                      // above the title, dissolving into the background so
+                      // the text sits on calm ground.
+                      SizedBox(
+                        height: imageHeight,
+                        width: double.infinity,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.asset(slide.asset, fit: BoxFit.cover),
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  stops: const [0.55, 1.0],
+                                  colors: [
+                                    Colors.transparent,
+                                    scheme.surface,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              slide.title,
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.6,
+                                height: 1.1,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              slide.body,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                                height: 1.45,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ),
-          ),
-        ),
-        Expanded(
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: _slides.length,
-            onPageChanged: (i) {
-              Haptics.selection();
-              setState(() => _index = i);
-            },
-            itemBuilder: (context, i) {
-              final slide = _slides[i];
-              // Bluesky-style: illustration up top, then a large
-              // left-aligned heading and body.
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            // Bottom control row: dots on the left, a compact pill button
+            // on the right (Bluesky-style).
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(28, 8, 24, 16),
+                child: Row(
                   children: [
-                    Center(child: SvgPicture.asset(slide.asset, height: 240)),
-                    const SizedBox(height: 36),
-                    Text(
-                      slide.title,
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.6,
-                        height: 1.1,
+                    for (var i = 0; i < _slides.length; i++)
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
+                        curve: Curves.easeOut,
+                        margin: const EdgeInsets.only(right: 7),
+                        width: i == _index ? 22 : 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: i == _index
+                              ? scheme.primary
+                              : scheme.outlineVariant,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      slide.body,
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: scheme.onSurfaceVariant,
-                        height: 1.45,
+                    const Spacer(),
+                    FilledButton(
+                      onPressed: _next,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 46),
+                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                        shape: const StadiumBorder(),
+                        textStyle: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                        ),
                       ),
+                      child: Text(isLast ? 'Get started' : 'Next'),
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-        ),
-        // Bottom control row: dots on the left, a compact pill button on
-        // the right (Bluesky-style) instead of a full-width slab.
-        Padding(
-          padding: const EdgeInsets.fromLTRB(28, 8, 24, 20),
-          child: Row(
-            children: [
-              for (var i = 0; i < _slides.length; i++)
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  margin: const EdgeInsets.only(right: 7),
-                  width: i == _index ? 22 : 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: i == _index ? scheme.primary : scheme.outlineVariant,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              const Spacer(),
-              FilledButton(
-                onPressed: _next,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(0, 46),
-                  padding: const EdgeInsets.symmetric(horizontal: 28),
-                  shape: const StadiumBorder(),
-                  textStyle: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
-                ),
-                child: Text(isLast ? 'Get started' : 'Next'),
               ),
-            ],
+            ),
+          ],
+        ),
+        // Skip: a frosted pill floating over the photo.
+        Positioned(
+          top: 0,
+          right: 16,
+          child: SafeArea(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: Material(
+                  color: Colors.black.withValues(alpha: 0.28),
+                  child: InkWell(
+                    onTap: _toMethods,
+                    child: const Padding(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+                      child: Text(
+                        'Skip',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ],

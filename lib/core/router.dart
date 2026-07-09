@@ -6,7 +6,9 @@ import '../features/contacts/contacts_screen.dart';
 import '../features/governance/governance_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/home_screen.dart';
+import '../data/models.dart';
 import '../data/news.dart';
+import '../features/history/transaction_screen.dart';
 import '../features/network/network_screen.dart';
 import '../features/news/news_post_screen.dart';
 import '../features/news/news_screen.dart';
@@ -112,6 +114,13 @@ GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
       GoRoute(
         path: '/notifications',
         pageBuilder: (_, s) => _page(s, const NotificationsScreen()),
+      ),
+      GoRoute(
+        path: '/tx',
+        // Tiles pass the record along; a bare deep link goes to History.
+        redirect: (context, s) => s.extra is TransferRecord ? null : '/history',
+        pageBuilder: (_, s) =>
+            _page(s, TransactionScreen(record: s.extra! as TransferRecord)),
       ),
       GoRoute(
         path: '/news',

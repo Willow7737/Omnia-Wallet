@@ -61,14 +61,16 @@ class HomeScreen extends ConsumerWidget {
                     child: _ActionButton(
                       icon: Icons.arrow_upward,
                       label: 'Send',
+                      color: context.omnia.negative,
                       onTap: () => context.push('/send'),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: _ActionButton(
-                      icon: Icons.qr_code,
+                      icon: Icons.arrow_downward,
                       label: 'Receive',
+                      color: context.omnia.positive,
                       onTap: () => context.push('/receive'),
                     ),
                   ),
@@ -351,11 +353,15 @@ class _ActionButton extends StatelessWidget {
   const _ActionButton({
     required this.icon,
     required this.label,
+    required this.color,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
+
+  /// Semantic tint: send reads warm/red, receive reads green.
+  final Color color;
   final VoidCallback onTap;
 
   @override
@@ -367,7 +373,12 @@ class _ActionButton extends StatelessWidget {
       },
       icon: Icon(icon),
       label: Text(label),
-      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+      style: FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(56),
+        backgroundColor: color.withValues(alpha: 0.13),
+        foregroundColor: color,
+        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+      ),
     );
   }
 }
@@ -437,24 +448,57 @@ class _ActivitySkeleton extends StatelessWidget {
   }
 }
 
-class TransferTile extends StatelessWidget {
+/// One transfer in a list. Your own sends read loud (red, minus, "You
+/// sent"); other users' activity reads quiet and neutral. Tapping opens the
+/// full transaction page.
+class TransferTile extends ConsumerWidget {
   const TransferTile({super.key, required this.record});
   final TransferRecord record;
 
   @override
-  Widget build(BuildContext context) {
-    final negative = context.omnia.negative;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final omnia = context.omnia;
+    final myDid = ref.watch(identityProvider).valueOrNull?.did;
+    final mine = myDid != null && record.fromDid == myDid;
+
+    final tint = mine ? omnia.negative : scheme.onSurfaceVariant;
+
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: const CircleAvatar(child: Icon(Icons.arrow_upward)),
-      title: Text('Sent ${Fmt.ubc(record.amount)}'),
+      onTap: () {
+        Haptics.light();
+        context.push('/tx', extra: record);
+      },
+      leading: CircleAvatar(
+        backgroundColor: tint.withValues(alpha: 0.12),
+        child: Icon(
+          mine ? Icons.arrow_upward : Icons.swap_horiz,
+          color: tint,
+          size: 22,
+        ),
+      ),
+      title: Text(
+        mine
+            ? 'You sent ${Fmt.ubc(record.amount)}'
+            : '${Fmt.shortDid(record.fromDid)} sent '
+                '${Fmt.ubc(record.amount)}',
+        style: theme.textTheme.titleSmall?.copyWith(
+          fontWeight: mine ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
       subtitle: Text(
         'To ${Fmt.shortDid(record.toDid)}\n${Fmt.dateTime(record.dateTime)}',
       ),
       isThreeLine: true,
       trailing: Text(
-        '−${record.amount}',
-        style: TextStyle(fontWeight: FontWeight.w700, color: negative),
+        mine ? '−${record.amount}' : '${record.amount}',
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          fontFeatures: const [FontFeature.tabularFigures()],
+          color: mine ? omnia.negative : scheme.onSurfaceVariant,
+        ),
       ),
     );
   }

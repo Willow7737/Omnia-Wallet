@@ -10,7 +10,7 @@ class FadeSlideIn extends StatefulWidget {
     super.key,
     required this.child,
     this.delay = Duration.zero,
-    this.offset = 12,
+    this.offset = 6,
   });
 
   final Widget child;

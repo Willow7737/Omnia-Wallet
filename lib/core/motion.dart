@@ -7,11 +7,11 @@ class Motion {
   Motion._();
 
   // Durations
-  static const Duration micro = Duration(milliseconds: 120);
-  static const Duration fast = Duration(milliseconds: 220);
-  static const Duration normal = Duration(milliseconds: 340);
-  static const Duration slow = Duration(milliseconds: 520);
-  static const Duration count = Duration(milliseconds: 900);
+  static const Duration micro = Duration(milliseconds: 100);
+  static const Duration fast = Duration(milliseconds: 180);
+  static const Duration normal = Duration(milliseconds: 280);
+  static const Duration slow = Duration(milliseconds: 420);
+  static const Duration count = Duration(milliseconds: 800);
 
   // Curves — emphasized easing for entrances, standard for the rest.
   static const Curve emphasized = Cubic(0.2, 0.0, 0.0, 1.0);
@@ -41,8 +41,9 @@ Page<T> fadeThroughPage<T>({
       return FadeTransition(
         opacity: curved,
         child: SlideTransition(
+          // A whisper of travel — enough to feel alive, never showy.
           position: Tween<Offset>(
-            begin: const Offset(0, 0.035),
+            begin: const Offset(0, 0.018),
             end: Offset.zero,
           ).animate(curved),
           child: child,
