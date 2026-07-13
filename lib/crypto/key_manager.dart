@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:ed25519_edwards/ed25519_edwards.dart' as ed;
 
 import '../core/auth_mode.dart';
+import '../core/config.dart';
 
 /// The wallet's identity: either derived from an on-device Ed25519 keypair
 /// (self-custody) or linked to a Supabase account (server-assisted).
@@ -92,4 +93,22 @@ class KeyManager {
     final sig = ed.sign(priv, Uint8List.fromList(message.codeUnits));
     return hex.encode(sig);
   }
+
+  /// Build the canonical message a wallet signs to authorize a transfer
+  /// (self-sovereign spend, Step 2). Newline-delimited with a fixed field
+  /// order — MUST match `transfer_message` in the node's `wallet_auth.rs`:
+  ///
+  /// ```text
+  /// omnia-transfer-v1\n<nonce>\n<from_did>\n<to_did>\n<amount>
+  /// ```
+  ///
+  /// Newlines make the encoding unambiguous (DIDs contain `:`); the node
+  /// rejects DIDs containing control characters before verification.
+  String transferMessage({
+    required String nonce,
+    required String fromDid,
+    required String toDid,
+    required int amount,
+  }) =>
+      '${AppConfig.transferMessagePrefix}\n$nonce\n$fromDid\n$toDid\n$amount';
 }

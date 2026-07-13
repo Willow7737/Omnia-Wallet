@@ -171,6 +171,45 @@ class AuthRepository {
   String _signChallenge(Uint8List seed, String message) =>
       _keys.signHex(seed, message);
 
+  /// Build a wallet-signed spend authorization for a transfer (Step 2:
+  /// self-sovereign transfers).
+  ///
+  /// Self-custody (Mode A): fetches a fresh single-use nonce from
+  /// `/auth/challenge`, signs the canonical transfer message
+  /// (`omnia-transfer-v1\n<nonce>\n<from>\n<to>\n<amount>`) with the
+  /// on-device key, and returns the authorization to attach to the
+  /// transfer. The private key never leaves the device.
+  ///
+  /// Supabase (Mode B): returns `null` — there is no on-device key, so the
+  /// transfer falls back to node-attested authorization (the JWT alone).
+  Future<TransferAuthorization?> authorizeTransfer({
+    required String toDid,
+    required int amount,
+  }) async {
+    if (await authMode() == AuthMode.supabase) return null;
+
+    final seed = await _store.readSeed();
+    if (seed == null) {
+      throw StateError('No wallet on device — create or import one first');
+    }
+    final identity = _keys.identityFromSeed(seed);
+    final publicKeyHex = identity.publicKeyHex!;
+
+    // A fresh challenge nonce, bound to this key and single-use on the node.
+    final challenge = await _api.requestChallenge(publicKeyHex);
+    final message = _keys.transferMessage(
+      nonce: challenge.nonce,
+      fromDid: identity.did,
+      toDid: toDid,
+      amount: amount,
+    );
+    return TransferAuthorization(
+      publicKeyHex: publicKeyHex,
+      nonce: challenge.nonce,
+      signatureHex: _keys.signHex(seed, message),
+    );
+  }
+
   Future<void> logout() async {
     _session = null;
     _identity = null;
