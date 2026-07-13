@@ -143,8 +143,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       ref.invalidate(historyProvider);
       // When the wallet signed the transfer itself (self-custody), say so —
       // the spend was authorized by the on-device key, not just the session.
-      final signedNote =
-          result.isWalletSigned ? ' · signed on-device' : '';
+      final signedNote = result.isWalletSigned ? ' · signed on-device' : '';
       ref.read(noticesProvider.notifier).add(
             type: NoticeType.sent,
             title: 'Sent ${Fmt.ubc(result.amount)}',
