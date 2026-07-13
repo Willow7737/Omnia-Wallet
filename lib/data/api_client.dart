@@ -103,15 +103,27 @@ class ApiClient {
   }
 
   /// `POST /api/v1/economics/transfer` — spends (burns) UBC. Soulbound.
+  ///
+  /// When [authorization] is provided (self-custody wallets), the node
+  /// verifies the wallet's own Ed25519 signature over the transfer before
+  /// spending — the result's `provenance` comes back `wallet_signed`.
+  /// Without it the transfer is JWT-only (`node_attested`), the path
+  /// Supabase-mode wallets use.
   Future<TransferResult> transfer({
     required String fromDid,
     required String toDid,
     required int amount,
     required String token,
+    TransferAuthorization? authorization,
   }) async {
     final res = await _dio.post<Map<String, dynamic>>(
       '/api/v1/economics/transfer',
-      data: {'from_did': fromDid, 'to_did': toDid, 'amount': amount},
+      data: {
+        'from_did': fromDid,
+        'to_did': toDid,
+        'amount': amount,
+        if (authorization != null) 'authorization': authorization.toJson(),
+      },
       options: _auth(token),
     );
     return TransferResult.fromJson(res.data!);

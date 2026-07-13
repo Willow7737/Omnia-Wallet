@@ -102,4 +102,63 @@ void main() {
       expect(km.validateMnemonic(km.generateMnemonic()), isTrue);
     });
   });
+
+  group('transfer authorization (Step 2, self-sovereign spend)', () {
+    test('canonical message matches the node field order and delimiters', () {
+      final msg = km.transferMessage(
+        nonce: '00ff',
+        fromDid: 'did:omnia:from',
+        toDid: 'did:omnia:to',
+        amount: 500,
+      );
+      // MUST match transfer_message in the node's wallet_auth.rs.
+      expect(msg, 'omnia-transfer-v1\n00ff\ndid:omnia:from\ndid:omnia:to\n500');
+    });
+
+    test('signature over the transfer message verifies; tampering fails', () {
+      final seed = Uint8List.fromList(List.generate(32, (i) => (i * 5) % 256));
+      final priv = km.privateKeyFromSeed(seed);
+      final pub = ed.public(priv);
+      final fromDid = km.didFromPublicKey(km.publicKeyBytes(priv));
+
+      final message = km.transferMessage(
+        nonce: 'cafe',
+        fromDid: fromDid,
+        toDid: 'did:omnia:recipient',
+        amount: 42,
+      );
+      final sigHex = km.signHex(seed, message);
+
+      expect(
+        ed.verify(pub, Uint8List.fromList(message.codeUnits),
+            Uint8List.fromList(hex.decode(sigHex))),
+        isTrue,
+      );
+
+      // Any mutated field invalidates the signature.
+      for (final tampered in [
+        km.transferMessage(
+            nonce: 'cafe',
+            fromDid: fromDid,
+            toDid: 'did:omnia:recipient',
+            amount: 43),
+        km.transferMessage(
+            nonce: 'cafe',
+            fromDid: fromDid,
+            toDid: 'did:omnia:evil',
+            amount: 42),
+        km.transferMessage(
+            nonce: 'beef',
+            fromDid: fromDid,
+            toDid: 'did:omnia:recipient',
+            amount: 42),
+      ]) {
+        expect(
+          ed.verify(pub, Uint8List.fromList(tampered.codeUnits),
+              Uint8List.fromList(hex.decode(sigHex))),
+          isFalse,
+        );
+      }
+    });
+  });
 }

@@ -141,18 +141,22 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       );
       ref.invalidate(balanceProvider);
       ref.invalidate(historyProvider);
+      // When the wallet signed the transfer itself (self-custody), say so —
+      // the spend was authorized by the on-device key, not just the session.
+      final signedNote = result.isWalletSigned ? ' · signed on-device' : '';
       ref.read(noticesProvider.notifier).add(
             type: NoticeType.sent,
             title: 'Sent ${Fmt.ubc(result.amount)}',
             body: 'To ${Fmt.shortDid(toDid)} · '
-                'new balance ${Fmt.ubc(result.newBalance)}',
+                'new balance ${Fmt.ubc(result.newBalance)}$signedNote',
           );
       if (!mounted) return;
       Haptics.success();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Sent ${Fmt.ubc(result.amount)} · new balance ${Fmt.ubc(result.newBalance)}',
+            'Sent ${Fmt.ubc(result.amount)} · '
+            'new balance ${Fmt.ubc(result.newBalance)}$signedNote',
           ),
         ),
       );
