@@ -9,6 +9,7 @@ import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
 import '../../core/widgets/hud.dart';
+import '../../data/payment_request.dart';
 import '../../state/contacts.dart';
 import '../../state/notices.dart';
 import '../../state/providers.dart';
@@ -56,14 +57,24 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     return null;
   }
 
+  /// Apply a scanned/pasted payment request: fill the recipient, and prefill
+  /// the amount when the request carried one.
+  void _applyRequest(PaymentRequest request) {
+    Haptics.selection();
+    _toDidController.text = request.did;
+    if (request.amount != null) {
+      _amountController.text = request.amount.toString();
+    }
+    setState(() {});
+  }
+
   Future<void> _scanDid() async {
     Haptics.medium();
-    final did = await Navigator.of(context).push<String>(
+    final request = await Navigator.of(context).push<PaymentRequest>(
       MaterialPageRoute(builder: (_) => const ScanDidScreen()),
     );
-    if (did != null) {
-      Haptics.selection();
-      _toDidController.text = did;
+    if (request != null) {
+      _applyRequest(request);
     }
   }
 
@@ -78,8 +89,15 @@ class _SendScreenState extends ConsumerState<SendScreen> {
 
   Future<void> _paste() async {
     final data = await Clipboard.getData('text/plain');
-    if (data?.text != null) {
-      _toDidController.text = data!.text!.trim();
+    final text = data?.text;
+    if (text == null) return;
+    // A pasted payment request (omnia:did?amount=…) prefills the amount too;
+    // anything else drops into the recipient field as-is.
+    final request = PaymentRequest.parse(text);
+    if (request != null) {
+      _applyRequest(request);
+    } else {
+      _toDidController.text = text.trim();
     }
   }
 
