@@ -59,23 +59,36 @@ class TransactionScreen extends ConsumerWidget {
                     color: mine ? omnia.negative : scheme.onSurface,
                   ),
                 ),
-                const SizedBox(height: 6),
-                // Status chip.
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: (ok ? omnia.success : omnia.warning)
-                        .withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    record.status.isEmpty ? 'recorded' : record.status,
-                    style: theme.textTheme.labelMedium?.copyWith(
+                const SizedBox(height: 8),
+                // Status + provenance chips.
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _Chip(
+                      label: record.status.isEmpty ? 'recorded' : record.status,
                       color: ok ? omnia.success : omnia.warning,
-                      fontWeight: FontWeight.w700,
                     ),
-                  ),
+                    // Lane 0 fast-path finality (only when the node tracks it).
+                    if (record.lane0Final != null)
+                      _Chip(
+                        label: record.lane0Final!
+                            ? 'Final · Lane 0'
+                            : 'Awaiting finality',
+                        color: record.lane0Final! ? omnia.success : tint,
+                        icon: record.lane0Final!
+                            ? Icons.bolt
+                            : Icons.hourglass_empty,
+                      ),
+                    // On-device signature (self-sovereign spend).
+                    if (record.isWalletSigned)
+                      _Chip(
+                        label: 'Signed on-device',
+                        color: scheme.primary,
+                        icon: Icons.verified_user_outlined,
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -105,6 +118,13 @@ class TransactionScreen extends ConsumerWidget {
                     label: 'Date',
                     value: Fmt.dateTime(record.dateTime),
                   ),
+                  const Divider(height: 1),
+                  _Row(
+                    label: 'Authorization',
+                    value: record.isWalletSigned
+                        ? 'Signed on-device with your key'
+                        : 'Authorized by session (node-attested)',
+                  ),
                   if (record.id.isNotEmpty) ...[
                     const Divider(height: 1),
                     _Row(
@@ -114,6 +134,17 @@ class TransactionScreen extends ConsumerWidget {
                               '${record.id.substring(record.id.length - 8)}'
                           : record.id,
                       onTap: () => _copy(context, 'Transaction ID', record.id),
+                    ),
+                  ],
+                  if (record.eventId != null && record.eventId!.isNotEmpty) ...[
+                    const Divider(height: 1),
+                    _Row(
+                      label: 'On-chain event',
+                      value: record.eventId!.length > 18
+                          ? '${record.eventId!.substring(0, 8)}…'
+                              '${record.eventId!.substring(record.eventId!.length - 8)}'
+                          : record.eventId!,
+                      onTap: () => _copy(context, 'Event ID', record.eventId!),
                     ),
                   ],
                   if (mine) ...[
@@ -138,6 +169,41 @@ class TransactionScreen extends ConsumerWidget {
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: scheme.onSurfaceVariant),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A small pill used for status / finality / signing indicators.
+class _Chip extends StatelessWidget {
+  const _Chip({required this.label, required this.color, this.icon});
+
+  final String label;
+  final Color color;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            label,
+            style: theme.textTheme.labelMedium
+                ?.copyWith(color: color, fontWeight: FontWeight.w700),
           ),
         ],
       ),
