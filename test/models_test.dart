@@ -90,6 +90,39 @@ void main() {
     });
   });
 
+  test('TransferResult parses provenance; defaults to node_attested', () {
+    final signed = TransferResult.fromJson({
+      'status': 'completed',
+      'amount': 500,
+      'new_balance': 9500,
+      'provenance': 'wallet_signed',
+    });
+    expect(signed.provenance, 'wallet_signed');
+    expect(signed.isWalletSigned, isTrue);
+
+    // Older nodes / node-attested transfers omit the field.
+    final legacy = TransferResult.fromJson({
+      'status': 'completed',
+      'amount': 500,
+      'new_balance': 9500,
+    });
+    expect(legacy.provenance, 'node_attested');
+    expect(legacy.isWalletSigned, isFalse);
+  });
+
+  test('TransferAuthorization serializes to the node wire shape', () {
+    final auth = TransferAuthorization(
+      publicKeyHex: 'aa',
+      nonce: 'bb',
+      signatureHex: 'cc',
+    );
+    expect(auth.toJson(), {
+      'public_key': 'aa',
+      'nonce': 'bb',
+      'signature': 'cc',
+    });
+  });
+
   test('LoginResponse and ChallengeResponse parse', () {
     final c = ChallengeResponse.fromJson({
       'did': 'did:omnia:x',
