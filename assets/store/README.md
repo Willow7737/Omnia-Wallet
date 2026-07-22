@@ -1,8 +1,10 @@
 # Play Store graphic assets
 
-First-pass, brand-matched source art for the Google Play listing, in the
-app's palette (blurple `#5865F2`, dark `#1E1F22`/`#2B2D31`, Inter). These are
-**starting points** — refine freely, then export to the PNGs Play requires.
+Brand-matched source art for the Google Play listing, in the Omnia design
+system: the clean, minimalist **light** look — near-white ground with a faint
+dot grid, the halftone node-square "O" mark in a white rounded tile, and the
+`Omnia` / `Wallet` wordmark set in **Inter** (ink `#313338` over grey
+`#80848E`). Export to the PNGs Play requires.
 
 | Source | Export to | Play requirement |
 |---|---|---|

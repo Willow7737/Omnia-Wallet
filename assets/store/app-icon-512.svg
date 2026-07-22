@@ -1,25 +1,29 @@
 <svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Omnia Wallet icon">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#5865F2"/>
-      <stop offset="1" stop-color="#4048C9"/>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F4F5F6"/>
     </linearGradient>
-    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#F9F9FA"/>
-      <stop offset="1" stop-color="#DBDEE1"/>
-    </linearGradient>
+    <pattern id="dots512" width="12" height="12" patternUnits="userSpaceOnUse">
+      <circle cx="6" cy="6" r="2.2" fill="#FFFFFF" fill-opacity="0.92"/>
+    </pattern>
   </defs>
 
-  <!-- Full-bleed background (Play's 512 icon has no transparency). -->
-  <rect width="512" height="512" fill="url(#bg)"/>
+  <!-- Full-bleed background (Play masks the corners itself). -->
+  <rect width="512" height="512" fill="url(#tile)"/>
 
-  <!-- Self-custody "shield ring" + key core, centered with safe margin. -->
-  <g transform="translate(256 256)">
-    <circle r="150" fill="none" stroke="#F9F9FA" stroke-width="26" stroke-opacity="0.9"/>
-    <circle r="150" fill="none" stroke="#1E1F22" stroke-width="26" stroke-opacity="0.12" stroke-dasharray="12 30"/>
-    <circle r="92" fill="url(#core)"/>
-    <!-- keyhole cut, echoing "your keys" -->
-    <circle r="34" fill="#4048C9"/>
-    <rect x="-12" y="22" width="24" height="66" rx="8" fill="#4048C9"/>
+  <!-- Omnia mark, centered (mark is 160x200, scaled 1.5 → 240x300). -->
+  <g transform="translate(136 106) scale(1.5)">
+    <rect x="48" y="0" width="76" height="56" fill="#3A3D42"/>
+    <rect x="48" y="0" width="76" height="56" fill="url(#dots512)"/>
+    <rect x="36" y="144" width="76" height="56" fill="#B9BDC4"/>
+    <rect x="36" y="144" width="76" height="56" fill="url(#dots512)"/>
+    <rect x="36" y="36" width="24" height="128" fill="#8A8F98"/>
+    <rect x="36" y="36" width="24" height="128" fill="url(#dots512)"/>
+    <rect x="100" y="36" width="24" height="128" fill="#6E7278"/>
+    <rect x="100" y="36" width="24" height="128" fill="url(#dots512)"/>
+    <rect x="8" y="74" width="40" height="52" fill="#17181B"/>
+    <rect x="112" y="74" width="40" height="52" fill="#17181B"/>
+    <rect x="58" y="12" width="44" height="176" fill="#FFFFFF"/>
   </g>
 </svg>
