@@ -492,13 +492,34 @@ class TransferTile extends ConsumerWidget {
         'To ${Fmt.shortDid(record.toDid)}\n${Fmt.dateTime(record.dateTime)}',
       ),
       isThreeLine: true,
-      trailing: Text(
-        mine ? '−${record.amount}' : '${record.amount}',
-        style: TextStyle(
-          fontWeight: FontWeight.w800,
-          fontFeatures: const [FontFeature.tabularFigures()],
-          color: mine ? omnia.negative : scheme.onSurfaceVariant,
-        ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            mine ? '−${record.amount}' : '${record.amount}',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              color: mine ? omnia.negative : scheme.onSurfaceVariant,
+            ),
+          ),
+          // At-a-glance provenance/finality cues (details on the tx screen).
+          if (record.isWalletSigned || record.lane0Final == true) ...[
+            const SizedBox(height: 3),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (record.lane0Final == true)
+                  Icon(Icons.bolt, size: 13, color: omnia.success),
+                if (record.isWalletSigned)
+                  Icon(Icons.verified_user_outlined,
+                      size: 12, color: scheme.primary),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }
