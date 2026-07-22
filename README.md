@@ -2,6 +2,19 @@
 
 > **Self-custodial mobile wallet for the Omnia Protocol**
 
+The wallet holds an Ed25519 keypair **on the device** (never a shared secret), derives an Omnia DID from the public key, and authenticates to an Omnia node with a challenge/signature login — or via **Supabase sign-in** (Google/GitHub/email) with node JWTs minted by an edge function (dual-mode auth).
+
+**Shipped in v1** (live against the public testnet — a multi-node Lane 0
+validator network with measured BFT finality; see the protocol repo's
+[`benchmark-gates.md`](https://github.com/Willow7737/omnia-protocol/blob/main/docs/reference/benchmark-gates.md)):
+
+- **Balance, send, and transaction history** with per-transaction detail
+  including **Lane 0 finality status** and signing provenance
+- **Governance** — view, vote, and create proposals (quadratic voting)
+- **QR send/receive** with request-amounts, plus an address book
+- **Biometric app lock**, in-app notifications, and a team news feed
+  with threaded replies and images
+- Onboarding with BIP39 mnemonic backup / import
 [![Flutter](https://img.shields.io/badge/Flutter-3.22+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.4+-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
