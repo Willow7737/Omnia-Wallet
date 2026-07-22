@@ -60,6 +60,12 @@ class SecureStore {
   Future<void> saveContacts(String json) async =>
       _storage.write(key: AppConfig.kContactsKey, value: json);
 
+  Future<String?> readBlockedUsers() async =>
+      _storage.read(key: AppConfig.kBlockedUsersKey);
+
+  Future<void> saveBlockedUsers(String json) async =>
+      _storage.write(key: AppConfig.kBlockedUsersKey, value: json);
+
   Future<String?> readDisplayName() async =>
       _storage.read(key: AppConfig.kDisplayNameKey);
 

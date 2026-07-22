@@ -51,6 +51,13 @@ class SettingsScreen extends ConsumerWidget {
             trailing: const Icon(Icons.chevron_right),
             onTap: () => context.push('/contacts'),
           ),
+          ListTile(
+            leading: const Icon(Icons.shield_outlined),
+            title: const Text('Safety'),
+            subtitle: const Text('Community guidelines & blocked accounts'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => context.push('/safety'),
+          ),
           const Divider(),
           const _SectionHeader('Node'),
           ListTile(

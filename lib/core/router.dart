@@ -9,6 +9,7 @@ import '../features/home/home_screen.dart';
 import '../data/models.dart';
 import '../data/news.dart';
 import '../features/history/transaction_screen.dart';
+import '../features/moderation/safety_screen.dart';
 import '../features/network/network_screen.dart';
 import '../features/news/news_post_screen.dart';
 import '../features/news/news_screen.dart';
@@ -110,6 +111,10 @@ GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
       GoRoute(
         path: '/network',
         pageBuilder: (_, s) => _page(s, const NetworkScreen()),
+      ),
+      GoRoute(
+        path: '/safety',
+        pageBuilder: (_, s) => _page(s, const SafetyScreen()),
       ),
       GoRoute(
         path: '/notifications',

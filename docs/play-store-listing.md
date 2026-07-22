@@ -100,9 +100,19 @@ features). Answer truthfully; typical answers for this app:
 - **Can users share their location with others?** **No.**
 - **Digital purchases / real-currency gambling?** **No.** (UBC is a soulbound
   utility credit, not purchasable currency or a gambling mechanic.)
-- **User-generated content moderation:** be ready to describe that posts can
-  be reported/removed. (If you don't yet have moderation tooling, plan for it
-  — Play expects a way to handle objectionable UGC.)
+- **User-generated content moderation:** **Yes — implemented.** The app ships
+  the moderation surface Play expects for interactive UGC:
+  - **Report:** every reply has a “···” → **Report** action that files a
+    categorised report (spam, harassment, hate speech, sexual, violence,
+    other) into the `content_reports` table for the moderation team; reporters
+    see “reviewed within 24 hours”.
+  - **Block:** users can block an author from the same menu; blocked authors’
+    posts and replies are hidden from that user’s feed (managed under
+    **Settings → Safety**).
+  - **Community guidelines:** published in-app at **Settings → Safety**,
+    stating that violating content is removed and repeat offenders lose access.
+  Describe this flow in the questionnaire; no “plan for it later” caveat is
+  needed.
 
 Expected result: rated for a general/teen audience. **Target audience:**
 select **18+** given the finance/crypto context.

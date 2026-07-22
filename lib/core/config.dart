@@ -150,6 +150,10 @@ class AppConfig {
   static const String kLastSeenNewsKey = 'omnia.wallet.last_seen_news';
   static const String kAvatarPathKey = 'omnia.wallet.avatar_path';
 
+  /// Locally-blocked authors (JSON list of identifiers) — content moderation.
+  /// Blocking is client-side only: nothing is sent to the node.
+  static const String kBlockedUsersKey = 'omnia.wallet.blocked_users';
+
   /// Refresh the JWT this many seconds before it actually expires.
   static const int jwtRefreshSkewSecs = 60;
 }

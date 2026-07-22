@@ -10,6 +10,7 @@ import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
 import '../../data/news.dart';
+import '../../state/blocklist.dart';
 import '../../state/news.dart';
 import '../../state/providers.dart';
 import 'news_screen.dart';
@@ -219,6 +220,80 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
     }
   }
 
+  Future<void> _reportReply(NewsReply reply) async {
+    final gateway = ref.read(supabaseGatewayProvider);
+    if (!gateway.isSignedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sign in to report content.')),
+      );
+      return;
+    }
+    final reason = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => const _ReportSheet(),
+    );
+    if (reason == null) return;
+    try {
+      final token = await gateway.accessToken();
+      await ref.read(newsRepositoryProvider).reportContent(
+            contentType: 'reply',
+            contentId: reply.id,
+            reason: reason,
+            reportedAuthor: reply.authorDid ?? reply.authorName,
+            accessToken: token,
+          );
+      if (mounted) {
+        Haptics.success();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Reported. Thanks — our team reviews reports within 24 hours.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Haptics.error();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(friendlyError(e).message)),
+        );
+      }
+    }
+  }
+
+  Future<void> _blockUser(NewsReply reply) async {
+    final key = blockKeyFor(userId: reply.userId, name: reply.authorName);
+    if (key == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('Block ${reply.authorName}?'),
+        content: const Text(
+            "You won't see their posts or replies. You can unblock them "
+            'later in Settings.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(blocklistProvider.notifier).block(key);
+    if (mounted) {
+      Haptics.success();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Blocked ${reply.authorName}.')),
+      );
+    }
+  }
+
   void _startReplyTo(NewsReply reply) {
     Haptics.selection();
     setState(() {
@@ -235,6 +310,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
     final gateway = ref.watch(supabaseGatewayProvider);
     final canReply = mode == AuthMode.supabase && gateway.isSignedIn;
     final myUserId = gateway.isAvailable ? gateway.userId : null;
+    final blocked = ref.watch(blocklistProvider);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -284,10 +360,13 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
                       return _ThreadedReplies(
                         replies: replies,
                         myUserId: myUserId,
+                        blocked: blocked,
                         canInteract: canReply,
                         onReply: _startReplyTo,
                         onEdit: _editReply,
                         onDelete: _deleteReply,
+                        onReport: _reportReply,
+                        onBlock: _blockUser,
                       );
                     },
                   ),
@@ -482,26 +561,53 @@ class _ThreadedReplies extends StatelessWidget {
   const _ThreadedReplies({
     required this.replies,
     required this.myUserId,
+    required this.blocked,
     required this.canInteract,
     required this.onReply,
     required this.onEdit,
     required this.onDelete,
+    required this.onReport,
+    required this.onBlock,
   });
 
   final List<NewsReply> replies;
   final String? myUserId;
+  final Set<String> blocked;
   final bool canInteract;
   final void Function(NewsReply) onReply;
   final void Function(NewsReply) onEdit;
   final void Function(NewsReply) onDelete;
+  final void Function(NewsReply) onReport;
+  final void Function(NewsReply) onBlock;
+
+  bool _isBlocked(NewsReply r) {
+    final key = blockKeyFor(userId: r.userId, name: r.authorName);
+    return key != null && blocked.contains(key);
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Hide replies from blocked authors (content moderation, client-side).
+    final visible = replies.where((r) => !_isBlocked(r)).toList();
+    if (visible.isEmpty) {
+      final theme = Theme.of(context);
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Center(
+          child: Text(
+            'No replies to show.',
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ),
+      );
+    }
+
     final byParent = <String, List<NewsReply>>{};
     final topLevel = <NewsReply>[];
-    final ids = {for (final r in replies) r.id};
-    for (final r in replies) {
-      // Treat orphans (parent deleted) as top-level.
+    final ids = {for (final r in visible) r.id};
+    for (final r in visible) {
+      // Treat orphans (parent deleted or blocked) as top-level.
       if (r.parentId != null && ids.contains(r.parentId)) {
         byParent.putIfAbsent(r.parentId!, () => []).add(r);
       } else {
@@ -522,6 +628,8 @@ class _ThreadedReplies extends StatelessWidget {
         onReply: onReply,
         onEdit: onEdit,
         onDelete: onDelete,
+        onReport: onReport,
+        onBlock: onBlock,
       ));
       for (var j = 0; j < children.length; j++) {
         rows.add(Padding(
@@ -534,6 +642,8 @@ class _ThreadedReplies extends StatelessWidget {
             onReply: onReply,
             onEdit: onEdit,
             onDelete: onDelete,
+            onReport: onReport,
+            onBlock: onBlock,
             nested: true,
           ),
         ));
@@ -554,6 +664,8 @@ class _ReplyRow extends StatelessWidget {
     required this.onReply,
     required this.onEdit,
     required this.onDelete,
+    required this.onReport,
+    required this.onBlock,
     this.nested = false,
   });
 
@@ -565,6 +677,8 @@ class _ReplyRow extends StatelessWidget {
   final void Function(NewsReply) onReply;
   final void Function(NewsReply) onEdit;
   final void Function(NewsReply) onDelete;
+  final void Function(NewsReply) onReport;
+  final void Function(NewsReply) onBlock;
 
   @override
   Widget build(BuildContext context) {
@@ -617,27 +731,52 @@ class _ReplyRow extends StatelessWidget {
                         style: theme.textTheme.labelSmall
                             ?.copyWith(color: scheme.onSurfaceVariant),
                       ),
-                      if (isMine)
-                        PopupMenuButton<String>(
-                          tooltip: 'More',
-                          padding: EdgeInsets.zero,
-                          iconSize: 18,
-                          icon: Icon(Icons.more_horiz,
-                              color: scheme.onSurfaceVariant),
-                          onSelected: (action) {
-                            switch (action) {
-                              case 'edit':
-                                onEdit(reply);
-                              case 'delete':
-                                onDelete(reply);
-                            }
-                          },
-                          itemBuilder: (_) => const [
-                            PopupMenuItem(value: 'edit', child: Text('Edit')),
-                            PopupMenuItem(
-                                value: 'delete', child: Text('Delete')),
-                          ],
-                        ),
+                      PopupMenuButton<String>(
+                        tooltip: 'More',
+                        padding: EdgeInsets.zero,
+                        iconSize: 18,
+                        icon: Icon(Icons.more_horiz,
+                            color: scheme.onSurfaceVariant),
+                        onSelected: (action) {
+                          switch (action) {
+                            case 'edit':
+                              onEdit(reply);
+                            case 'delete':
+                              onDelete(reply);
+                            case 'report':
+                              onReport(reply);
+                            case 'block':
+                              onBlock(reply);
+                          }
+                        },
+                        itemBuilder: (_) => isMine
+                            ? const [
+                                PopupMenuItem(
+                                    value: 'edit', child: Text('Edit')),
+                                PopupMenuItem(
+                                    value: 'delete', child: Text('Delete')),
+                              ]
+                            : [
+                                const PopupMenuItem(
+                                  value: 'report',
+                                  child: ListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: Icon(Icons.flag_outlined),
+                                    title: Text('Report'),
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'block',
+                                  child: ListTile(
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    leading: const Icon(Icons.block),
+                                    title: Text('Block ${reply.authorName}'),
+                                  ),
+                                ),
+                              ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 3),
@@ -669,6 +808,58 @@ class _ReplyRow extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bottom sheet that asks why a piece of content is being reported and pops
+/// the chosen reason (content moderation). Returns null if dismissed.
+class _ReportSheet extends StatelessWidget {
+  const _ReportSheet();
+
+  static const _reasons = <(String, IconData)>[
+    ('Spam or scam', Icons.report_gmailerrorred_outlined),
+    ('Harassment or bullying', Icons.mood_bad_outlined),
+    ('Hate speech', Icons.volume_off_outlined),
+    ('Sexual or explicit content', Icons.no_adult_content_outlined),
+    ('Violence or threats', Icons.dangerous_outlined),
+    ('Other', Icons.more_horiz),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+            child: Text(
+              'Report content',
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+            child: Text(
+              'Tell us what’s wrong. Our team reviews every report within '
+              '24 hours and removes anything that breaks our guidelines.',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+          for (final (label, icon) in _reasons)
+            ListTile(
+              leading: Icon(icon),
+              title: Text(label),
+              onTap: () => Navigator.of(context).pop(label),
+            ),
+          const SizedBox(height: 8),
         ],
       ),
     );
