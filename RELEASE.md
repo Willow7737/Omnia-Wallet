@@ -75,9 +75,24 @@ or Play rejects it. Bump it for every release.
 ```bash
 flutter clean
 flutter pub get
+
+# PRODUCTION build. `OMNIA_ENV=production` selects the production endpoints;
+# omit it (or set anything else) for a testnet build.
 flutter build appbundle --release \
-  --dart-define=OMNIA_NODE_URL=https://<your-node-host>
+  --dart-define=OMNIA_ENV=production \
+  --dart-define=OMNIA_PROD_NODE_URL=https://<production-node-domain>
+  # If you run a separate production Supabase project, also pass:
+  #   --dart-define=OMNIA_PROD_SUPABASE_URL=https://<ref>.supabase.co
+  #   --dart-define=OMNIA_PROD_SUPABASE_ANON_KEY=<anon key>
 ```
+
+> **Environments.** The build defaults to **testnet**. A production listing
+> must be built with `--dart-define=OMNIA_ENV=production`. Until you provide a
+> dedicated production node domain, `OMNIA_PROD_NODE_URL` falls back to the
+> current live network — replace it with a stable domain before public
+> launch. See `lib/core/config.dart` for the full resolution order. The
+> config also exposes `AppConfig.showNetworkBadge` / `AppConfig.networkLabel`
+> so the UI can flag non-production builds.
 
 Output: `build/app/outputs/bundle/release/app-release.aab`.
 

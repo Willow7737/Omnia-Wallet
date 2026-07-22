@@ -212,6 +212,31 @@ class NewsRepository {
     );
   }
 
+  /// File a moderation report against a piece of content (content
+  /// moderation). Inserts a row into `content_reports`; RLS lets any
+  /// signed-in user insert but only moderators read/act. `reporter_id`
+  /// defaults to `auth.uid()` server-side.
+  Future<void> reportContent({
+    required String contentType,
+    required String contentId,
+    required String reason,
+    String? reportedAuthor,
+    String? details,
+    required String accessToken,
+  }) async {
+    await _dio.post<void>(
+      '$_baseUrl/rest/v1/content_reports',
+      data: {
+        'content_type': contentType,
+        'content_id': contentId,
+        'reason': reason,
+        if (reportedAuthor != null) 'reported_author': reportedAuthor,
+        if (details != null && details.isNotEmpty) 'details': details,
+      },
+      options: Options(headers: _headers(accessToken: accessToken)),
+    );
+  }
+
   /// Upload an image to the public `news-media` bucket and return its
   /// public URL. Requires a signed-in user (bucket policy).
   Future<String> uploadImage({

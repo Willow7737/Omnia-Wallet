@@ -1,20 +1,83 @@
 /// Global configuration and constants.
 ///
-/// The node base URL can be overridden at build/run time with:
-///   flutter run --dart-define=OMNIA_NODE_URL=http://10.0.2.2:9090
-/// and is also user-configurable at runtime from the Settings screen
-/// (persisted via secure storage).
+/// # Environments
+///
+/// The build targets one of [OmniaEnvironment.testnet] (default) or
+/// [OmniaEnvironment.production], selected at build time:
+///
+///   flutter build appbundle --release --dart-define=OMNIA_ENV=production \
+///     --dart-define=OMNIA_PROD_NODE_URL=https://your-prod-node-domain
+///
+/// Anything other than `production` (case-insensitive) resolves to testnet,
+/// so a release build only reaches production endpoints when explicitly asked.
+///
+/// Endpoint resolution precedence (highest first):
+///   1. An explicit per-key define (`OMNIA_NODE_URL`, `OMNIA_SUPABASE_URL`,
+///      `OMNIA_SUPABASE_ANON_KEY`) — wins in any environment.
+///   2. The active environment's default (production defaults are themselves
+///      overridable via `OMNIA_PROD_*` defines, so CI can inject real prod
+///      values without a code change).
+///
+/// The node URL is also user-configurable at runtime from Settings.
 library;
+
+/// Deployment environment selected at build time via `--dart-define=OMNIA_ENV`.
+enum OmniaEnvironment { testnet, production }
 
 class AppConfig {
   AppConfig._();
 
-  /// Default node base URL. Points at the live Omnia node; override at build
-  /// time with `--dart-define=OMNIA_NODE_URL=...` or at runtime in Settings.
-  static const String defaultNodeUrl = String.fromEnvironment(
-    'OMNIA_NODE_URL',
-    defaultValue: 'https://78.47.43.136.sslip.io',
+  // ---- Environment selection ----
+
+  static const String _envName =
+      String.fromEnvironment('OMNIA_ENV', defaultValue: 'testnet');
+
+  /// The active deployment environment.
+  static OmniaEnvironment get environment =>
+      _envName.trim().toLowerCase() == 'production'
+          ? OmniaEnvironment.production
+          : OmniaEnvironment.testnet;
+
+  /// Whether this build targets production endpoints.
+  static bool get isProduction => environment == OmniaEnvironment.production;
+
+  /// Human-readable label for the active network (for UI surfaces).
+  static String get networkLabel => isProduction ? 'Mainnet' : 'Testnet';
+
+  /// Whether the UI should show a visible network indicator. On (only) for
+  /// non-production builds, so a testnet build is never mistaken for the real
+  /// network.
+  static bool get showNetworkBadge => !isProduction;
+
+  // ---- Node endpoint ----
+
+  /// The current live Omnia network node. Until separate testnet and
+  /// production networks exist, both environments target this live node.
+  /// It is an IP-via-sslip.io endpoint — swap it (or set `OMNIA_PROD_NODE_URL`)
+  /// for a stable production domain before scaling.
+  static const String _liveNodeUrl = 'https://78.47.43.136.sslip.io';
+
+  static const String _testnetNodeUrl = _liveNodeUrl;
+
+  /// Production node URL — wired to the current live network by default.
+  /// Override at build time with
+  /// `--dart-define=OMNIA_PROD_NODE_URL=https://your-domain` (or the
+  /// `OMNIA_PROD_NODE_URL` CI variable) once a dedicated production node
+  /// domain exists.
+  static const String _productionNodeUrl = String.fromEnvironment(
+    'OMNIA_PROD_NODE_URL',
+    defaultValue: _liveNodeUrl,
   );
+
+  static const String _explicitNodeUrl =
+      String.fromEnvironment('OMNIA_NODE_URL', defaultValue: '');
+
+  /// Default node base URL for the active environment. An explicit
+  /// `--dart-define=OMNIA_NODE_URL` wins; otherwise the environment default.
+  /// Also user-overridable at runtime in Settings.
+  static String get defaultNodeUrl => _explicitNodeUrl.isNotEmpty
+      ? _explicitNodeUrl
+      : (isProduction ? _productionNodeUrl : _testnetNodeUrl);
 
   /// Domain-separation prefix for the login challenge signature.
   /// MUST match `AUTH_MESSAGE_PREFIX` in the node's `wallet_auth.rs`.
@@ -28,20 +91,41 @@ class AppConfig {
 
   // ---- Supabase (Mode B sign-in: Google / GitHub / email) ----
 
-  /// The Omnia Supabase project (same one the web dashboard uses).
-  static const String supabaseUrl = String.fromEnvironment(
-    'OMNIA_SUPABASE_URL',
-    defaultValue: 'https://iyajzmgnykgkivabxiuw.supabase.co',
-  );
+  static const String _testnetSupabaseUrl =
+      'https://iyajzmgnykgkivabxiuw.supabase.co';
 
   /// The project's anon (publishable) key — public by design, safe to ship.
-  static const String supabaseAnonKey = String.fromEnvironment(
-    'OMNIA_SUPABASE_ANON_KEY',
-    defaultValue:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6'
-        'Iml5YWp6bWdueWtna2l2YWJ4aXV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MTM5'
-        'MjgsImV4cCI6MjA5Nzk4OTkyOH0.PJT1Ha_XMk_LczAGjt3Wveg_aqzPJQU7m3-MtjAgErY',
+  static const String _testnetSupabaseAnonKey =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6'
+      'Iml5YWp6bWdueWtna2l2YWJ4aXV3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0MTM5'
+      'MjgsImV4cCI6MjA5Nzk4OTkyOH0.PJT1Ha_XMk_LczAGjt3Wveg_aqzPJQU7m3-MtjAgErY';
+
+  /// Production Supabase project — inject with `OMNIA_PROD_SUPABASE_URL` /
+  /// `OMNIA_PROD_SUPABASE_ANON_KEY`. Falls back to the current project until a
+  /// dedicated production project is provisioned.
+  static const String _productionSupabaseUrl = String.fromEnvironment(
+    'OMNIA_PROD_SUPABASE_URL',
+    defaultValue: _testnetSupabaseUrl,
   );
+  static const String _productionSupabaseAnonKey = String.fromEnvironment(
+    'OMNIA_PROD_SUPABASE_ANON_KEY',
+    defaultValue: _testnetSupabaseAnonKey,
+  );
+
+  static const String _explicitSupabaseUrl =
+      String.fromEnvironment('OMNIA_SUPABASE_URL', defaultValue: '');
+  static const String _explicitSupabaseAnonKey =
+      String.fromEnvironment('OMNIA_SUPABASE_ANON_KEY', defaultValue: '');
+
+  /// The active Supabase project URL for the current environment.
+  static String get supabaseUrl => _explicitSupabaseUrl.isNotEmpty
+      ? _explicitSupabaseUrl
+      : (isProduction ? _productionSupabaseUrl : _testnetSupabaseUrl);
+
+  /// The active Supabase anon key for the current environment.
+  static String get supabaseAnonKey => _explicitSupabaseAnonKey.isNotEmpty
+      ? _explicitSupabaseAnonKey
+      : (isProduction ? _productionSupabaseAnonKey : _testnetSupabaseAnonKey);
 
   static bool get supabaseConfigured =>
       supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty;
@@ -65,6 +149,10 @@ class AppConfig {
   static const String kNoticesKey = 'omnia.wallet.notices';
   static const String kLastSeenNewsKey = 'omnia.wallet.last_seen_news';
   static const String kAvatarPathKey = 'omnia.wallet.avatar_path';
+
+  /// Locally-blocked authors (JSON list of identifiers) — content moderation.
+  /// Blocking is client-side only: nothing is sent to the node.
+  static const String kBlockedUsersKey = 'omnia.wallet.blocked_users';
 
   /// Refresh the JWT this many seconds before it actually expires.
   static const int jwtRefreshSkewSecs = 60;

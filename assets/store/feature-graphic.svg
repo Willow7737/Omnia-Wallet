@@ -1,0 +1,52 @@
+<svg width="1024" height="500" viewBox="0 0 1024 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Omnia Wallet">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F2F3F5"/>
+    </linearGradient>
+    <!-- faint background dot grid -->
+    <pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.4" fill="#C7CBD1" fill-opacity="0.5"/>
+    </pattern>
+    <!-- crisp white halftone dots for the mark's textured blocks -->
+    <pattern id="dots" width="8" height="8" patternUnits="userSpaceOnUse">
+      <circle cx="4" cy="4" r="1.5" fill="#FFFFFF" fill-opacity="0.92"/>
+    </pattern>
+    <filter id="tileShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#1E1F22" flood-opacity="0.14"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="500" fill="url(#bg)"/>
+  <rect width="1024" height="500" fill="url(#grid)"/>
+
+  <!-- App tile -->
+  <g>
+    <rect x="118" y="94" width="312" height="312" rx="74" fill="#FFFFFF" filter="url(#tileShadow)"/>
+    <!-- Omnia mark, centered in the tile. Ring blocks first, white counter on top. -->
+    <g transform="translate(194 156) scale(1.0)">
+      <!-- top charcoal dotted bar -->
+      <rect x="48" y="0" width="76" height="56" fill="#3A3D42"/>
+      <rect x="48" y="0" width="76" height="56" fill="url(#dots)"/>
+      <!-- bottom light dotted bar -->
+      <rect x="36" y="144" width="76" height="56" fill="#B9BDC4"/>
+      <rect x="36" y="144" width="76" height="56" fill="url(#dots)"/>
+      <!-- left / right dotted columns -->
+      <rect x="36" y="36" width="24" height="128" fill="#8A8F98"/>
+      <rect x="36" y="36" width="24" height="128" fill="url(#dots)"/>
+      <rect x="100" y="36" width="24" height="128" fill="#6E7278"/>
+      <rect x="100" y="36" width="24" height="128" fill="url(#dots)"/>
+      <!-- outer black node squares -->
+      <rect x="8" y="74" width="40" height="52" fill="#17181B"/>
+      <rect x="112" y="74" width="40" height="52" fill="#17181B"/>
+      <!-- white counter (the hole), on top -->
+      <rect x="58" y="12" width="44" height="176" fill="#FFFFFF"/>
+    </g>
+  </g>
+
+  <!-- Wordmark: Omnia (ink) / Wallet (grey), matching the brand lockup -->
+  <g font-family="Inter, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif">
+    <text x="500" y="252" fill="#313338" font-size="128" font-weight="700" letter-spacing="-3">Omnia</text>
+    <text x="502" y="352" fill="#80848E" font-size="86" font-weight="500" letter-spacing="-1.5">Wallet</text>
+  </g>
+</svg>

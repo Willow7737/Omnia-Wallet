@@ -155,6 +155,63 @@ void main() {
       expect(sent?.headers?['content-length'], '3');
     });
 
+    test('reportContent posts a moderation report with the user token',
+        () async {
+      String? url;
+      Options? sent;
+      Object? body;
+      when(() => dio.post<void>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          )).thenAnswer((inv) async {
+        url = inv.positionalArguments.first as String;
+        sent = inv.namedArguments[#options] as Options?;
+        body = inv.namedArguments[#data];
+        return Response(requestOptions: _req(), statusCode: 201);
+      });
+
+      await repo.reportContent(
+        contentType: 'reply',
+        contentId: 'r9',
+        reason: 'Spam or scam',
+        reportedAuthor: 'did:omnia:zzzz',
+        details: 'link farm',
+        accessToken: 'user-token',
+      );
+      expect(url, contains('/rest/v1/content_reports'));
+      expect(sent?.headers?['authorization'], 'Bearer user-token');
+      final map = body as Map;
+      expect(map['content_type'], 'reply');
+      expect(map['content_id'], 'r9');
+      expect(map['reason'], 'Spam or scam');
+      expect(map['reported_author'], 'did:omnia:zzzz');
+      expect(map['details'], 'link farm');
+    });
+
+    test('reportContent omits empty details and null author', () async {
+      Object? body;
+      when(() => dio.post<void>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          )).thenAnswer((inv) async {
+        body = inv.namedArguments[#data];
+        return Response(requestOptions: _req(), statusCode: 201);
+      });
+
+      await repo.reportContent(
+        contentType: 'reply',
+        contentId: 'r10',
+        reason: 'Other',
+        details: '',
+        accessToken: 'user-token',
+      );
+      final map = body as Map;
+      expect(map.containsKey('details'), isFalse);
+      expect(map.containsKey('reported_author'), isFalse);
+    });
+
     test('addReply posts with the user access token and returns the row',
         () async {
       Options? sent;
