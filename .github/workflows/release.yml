@@ -63,8 +63,20 @@ jobs:
           storeFile=app/upload-keystore.jks
           EOF
 
-      - name: Build App Bundle
-        run: flutter build appbundle --release
+      - name: Build App Bundle (production)
+        env:
+          # Non-secret production endpoints, set as repo *variables*
+          # (Settings → Secrets and variables → Actions → Variables).
+          # Leaving them unset falls back to the current live network.
+          OMNIA_PROD_NODE_URL: ${{ vars.OMNIA_PROD_NODE_URL }}
+          OMNIA_PROD_SUPABASE_URL: ${{ vars.OMNIA_PROD_SUPABASE_URL }}
+          OMNIA_PROD_SUPABASE_ANON_KEY: ${{ vars.OMNIA_PROD_SUPABASE_ANON_KEY }}
+        run: |
+          flutter build appbundle --release \
+            --dart-define=OMNIA_ENV=production \
+            ${OMNIA_PROD_NODE_URL:+--dart-define=OMNIA_PROD_NODE_URL=$OMNIA_PROD_NODE_URL} \
+            ${OMNIA_PROD_SUPABASE_URL:+--dart-define=OMNIA_PROD_SUPABASE_URL=$OMNIA_PROD_SUPABASE_URL} \
+            ${OMNIA_PROD_SUPABASE_ANON_KEY:+--dart-define=OMNIA_PROD_SUPABASE_ANON_KEY=$OMNIA_PROD_SUPABASE_ANON_KEY}
 
       - name: Upload AAB artifact
         uses: actions/upload-artifact@v4
