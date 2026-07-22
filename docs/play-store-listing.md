@@ -73,6 +73,9 @@ reviews against the app and against `PRIVACY.md` / the Data Safety form).
 
 ## Graphic assets checklist
 
+> Brand-matched source art (feature graphic + 512 icon) is in
+> [`assets/store/`](../assets/store/) with SVG→PNG export instructions.
+
 | Asset | Spec | Notes |
 |---|---|---|
 | App icon | 512×512 PNG, 32-bit, ≤1 MB | Your launcher mark on a solid/again-safe background. |

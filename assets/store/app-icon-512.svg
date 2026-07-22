@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Omnia Wallet icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5865F2"/>
+      <stop offset="1" stop-color="#4048C9"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F9F9FA"/>
+      <stop offset="1" stop-color="#DBDEE1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Full-bleed background (Play's 512 icon has no transparency). -->
+  <rect width="512" height="512" fill="url(#bg)"/>
+
+  <!-- Self-custody "shield ring" + key core, centered with safe margin. -->
+  <g transform="translate(256 256)">
+    <circle r="150" fill="none" stroke="#F9F9FA" stroke-width="26" stroke-opacity="0.9"/>
+    <circle r="150" fill="none" stroke="#1E1F22" stroke-width="26" stroke-opacity="0.12" stroke-dasharray="12 30"/>
+    <circle r="92" fill="url(#core)"/>
+    <!-- keyhole cut, echoing "your keys" -->
+    <circle r="34" fill="#4048C9"/>
+    <rect x="-12" y="22" width="24" height="66" rx="8" fill="#4048C9"/>
+  </g>
+</svg>
