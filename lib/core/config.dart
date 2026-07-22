@@ -51,15 +51,22 @@ class AppConfig {
 
   // ---- Node endpoint ----
 
-  static const String _testnetNodeUrl = 'https://78.47.43.136.sslip.io';
+  /// The current live Omnia network node. Until separate testnet and
+  /// production networks exist, both environments target this live node.
+  /// It is an IP-via-sslip.io endpoint — swap it (or set `OMNIA_PROD_NODE_URL`)
+  /// for a stable production domain before scaling.
+  static const String _liveNodeUrl = 'https://78.47.43.136.sslip.io';
 
-  /// Production node URL. Inject the real one at build time with
-  /// `--dart-define=OMNIA_PROD_NODE_URL=https://<prod-node-domain>`. Until a
-  /// dedicated production node domain exists this falls back to the current
-  /// live network — replace it with a stable domain before a public launch.
+  static const String _testnetNodeUrl = _liveNodeUrl;
+
+  /// Production node URL — wired to the current live network by default.
+  /// Override at build time with
+  /// `--dart-define=OMNIA_PROD_NODE_URL=https://your-domain` (or the
+  /// `OMNIA_PROD_NODE_URL` CI variable) once a dedicated production node
+  /// domain exists.
   static const String _productionNodeUrl = String.fromEnvironment(
     'OMNIA_PROD_NODE_URL',
-    defaultValue: _testnetNodeUrl,
+    defaultValue: _liveNodeUrl,
   );
 
   static const String _explicitNodeUrl =
