@@ -1,0 +1,11 @@
+# Copy this file to `android/key.properties` and fill in real values.
+# `android/key.properties` and the keystore itself are gitignored — NEVER
+# commit them. See ../RELEASE.md for how to generate the upload keystore.
+#
+# `storeFile` is resolved relative to the `android/` directory. An absolute
+# path (e.g. /home/you/upload-keystore.jks) also works and is recommended so
+# the keystore lives outside the repo tree.
+storePassword=CHANGE_ME
+keyPassword=CHANGE_ME
+keyAlias=upload
+storeFile=upload-keystore.jks

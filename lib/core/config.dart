@@ -20,6 +20,12 @@ class AppConfig {
   /// MUST match `AUTH_MESSAGE_PREFIX` in the node's `wallet_auth.rs`.
   static const String authMessagePrefix = 'omnia-auth:';
 
+  /// Domain-separation prefix for a wallet-signed transfer authorization
+  /// (self-sovereign spend, Step 2). MUST match `TRANSFER_MESSAGE_PREFIX`
+  /// in the node's `wallet_auth.rs`. Distinct from [authMessagePrefix] so a
+  /// login signature can never be replayed as a spend authorization.
+  static const String transferMessagePrefix = 'omnia-transfer-v1';
+
   // ---- Supabase (Mode B sign-in: Google / GitHub / email) ----
 
   /// The Omnia Supabase project (same one the web dashboard uses).

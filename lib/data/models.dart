@@ -27,6 +27,29 @@ class Balance {
       );
 }
 
+/// A wallet-signed spend authorization attached to a transfer request
+/// (self-sovereign transfers, Step 2). Mirrors the node's
+/// `TransferAuthorization`: the wallet's public key, the single-use nonce
+/// it consumed from `/auth/challenge`, and the Ed25519 signature over the
+/// canonical transfer message.
+class TransferAuthorization {
+  TransferAuthorization({
+    required this.publicKeyHex,
+    required this.nonce,
+    required this.signatureHex,
+  });
+
+  final String publicKeyHex;
+  final String nonce;
+  final String signatureHex;
+
+  Map<String, dynamic> toJson() => {
+        'public_key': publicKeyHex,
+        'nonce': nonce,
+        'signature': signatureHex,
+      };
+}
+
 /// Result of `POST /api/v1/economics/transfer`.
 class TransferResult {
   TransferResult({
@@ -34,6 +57,7 @@ class TransferResult {
     required this.amount,
     required this.newBalance,
     this.note,
+    this.provenance = 'node_attested',
   });
 
   final String status;
@@ -41,11 +65,18 @@ class TransferResult {
   final int newBalance;
   final String? note;
 
+  /// Who authorized the spend: `wallet_signed` (the key owner's own
+  /// signature was verified — self-sovereign) or `node_attested` (JWT-only).
+  final String provenance;
+
+  bool get isWalletSigned => provenance == 'wallet_signed';
+
   factory TransferResult.fromJson(Map<String, dynamic> json) => TransferResult(
         status: json['status'] as String? ?? 'unknown',
         amount: (json['amount'] as num?)?.toInt() ?? 0,
         newBalance: (json['new_balance'] as num?)?.toInt() ?? 0,
         note: json['note'] as String?,
+        provenance: json['provenance'] as String? ?? 'node_attested',
       );
 }
 
@@ -59,6 +90,9 @@ class TransferRecord {
     required this.timestamp,
     required this.status,
     required this.newBalance,
+    this.eventId,
+    this.provenance = 'node_attested',
+    this.lane0Final,
   });
 
   final String id;
@@ -71,6 +105,21 @@ class TransferRecord {
   final String status;
   final int newBalance;
 
+  /// Hex ID of the on-chain causal-graph event recording this transfer,
+  /// or null if the provenance event wasn't submitted.
+  final String? eventId;
+
+  /// Who authorized the spend: `wallet_signed` (the key owner's own
+  /// signature was verified) or `node_attested` (JWT-only).
+  final String provenance;
+
+  /// Whether the transfer's event has reached Lane 0 fast-path finality.
+  /// Null when the node has Lane 0 disabled (the field is absent), so the
+  /// UI can distinguish "not final yet" from "finality not tracked here".
+  final bool? lane0Final;
+
+  bool get isWalletSigned => provenance == 'wallet_signed';
+
   DateTime get dateTime => DateTime.fromMillisecondsSinceEpoch(timestamp);
 
   factory TransferRecord.fromJson(Map<String, dynamic> json) => TransferRecord(
@@ -81,6 +130,9 @@ class TransferRecord {
         timestamp: (json['timestamp'] as num?)?.toInt() ?? 0,
         status: json['status'] as String? ?? '',
         newBalance: (json['new_balance'] as num?)?.toInt() ?? 0,
+        eventId: json['event_id'] as String?,
+        provenance: json['provenance'] as String? ?? 'node_attested',
+        lane0Final: json['lane0_final'] as bool?,
       );
 }
 

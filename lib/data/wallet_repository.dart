@@ -24,16 +24,24 @@ class WalletRepository {
 
   /// Spend (burn) [amount] UBC. UBC is soulbound — the recipient is recorded
   /// for provenance but is NOT credited.
+  ///
+  /// Self-custody wallets sign the transfer with their on-device key so the
+  /// node verifies the key owner — not just the JWT — authorized the spend
+  /// (Step 2, self-sovereign). Supabase-mode wallets have no on-device key,
+  /// so `authorizeTransfer` returns null and the spend is node-attested.
   Future<TransferResult> send({
     required String toDid,
     required int amount,
   }) async {
     final session = await _auth.ensureSession();
+    final authorization =
+        await _auth.authorizeTransfer(toDid: toDid, amount: amount);
     return _api.transfer(
       fromDid: session.did,
       toDid: toDid,
       amount: amount,
       token: session.token,
+      authorization: authorization,
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../data/payment_request.dart';
+
 /// Extract an Omnia DID from a scanned QR payload.
 ///
 /// Accepts a bare `did:omnia:<hex>` string or a payload that contains one
@@ -21,7 +23,8 @@ String? parseScannedDid(String? raw) {
 }
 
 /// Full-screen camera view that scans a QR code and pops with the recognized
-/// Omnia DID. Returns `null` if the user backs out.
+/// [PaymentRequest] (DID + optional requested amount). Returns `null` if the
+/// user backs out.
 class ScanDidScreen extends StatefulWidget {
   const ScanDidScreen({super.key});
 
@@ -47,10 +50,10 @@ class _ScanDidScreenState extends State<ScanDidScreen> {
   void _onDetect(BarcodeCapture capture) {
     if (_handled) return;
     for (final barcode in capture.barcodes) {
-      final did = parseScannedDid(barcode.rawValue);
-      if (did != null) {
+      final request = PaymentRequest.parse(barcode.rawValue);
+      if (request != null) {
         _handled = true;
-        Navigator.of(context).pop(did);
+        Navigator.of(context).pop(request);
         return;
       }
     }
