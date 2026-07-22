@@ -100,7 +100,9 @@ jarsigner -verify -verbose -certs \
 1. **Create app** → name **Omnia Wallet**, language, app (not game), free.
 2. **App signing**: accept **Play App Signing** (recommended). Play holds the
    app key; your upload key is what you just made.
-3. **Store listing**:
+3. **Store listing** — paste-ready copy, the graphic-asset checklist, and a
+   content-rating cheat-sheet are in
+   [`docs/play-store-listing.md`](./docs/play-store-listing.md):
    - Short description (≤80 chars) and full description.
    - App icon 512×512 PNG, feature graphic 1024×500.
    - At least 2 phone screenshots (grab from a device/emulator).
