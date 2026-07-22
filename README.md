@@ -264,6 +264,18 @@ Tests include:
 
 ---
 
+## 🚢 Releasing to Google Play
+
+Release signing reads from `android/key.properties` (gitignored — see
+`android/key.properties.example`); without it the `release` build falls back
+to debug signing, which Play rejects. The full runbook — upload keystore,
+building the signed AAB, Play Console listing, Data Safety form, and the
+hosted privacy policy — is in **[RELEASE.md](./RELEASE.md)**. The privacy
+policy Play requires is in **[PRIVACY.md](./PRIVACY.md)**. Pushing a `vX.Y.Z`
+tag builds the AAB via `.github/workflows/release.yml`.
+
+---
+
 ## 📊 UBC Soulbound Model
 
 > ⚠️ **Important**: UBC is currently **soulbound**
