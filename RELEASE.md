@@ -13,7 +13,7 @@ and the Play Console steps (store listing, Data Safety, privacy policy).
 ## 0. Prerequisites
 
 - Flutter (stable channel) + Android SDK, JDK 17.
-- A Google Play Developer account (one-time $25). You said this is verified ✅.
+- A Google Play Developer account (one-time $25). This is verified ✅.
 - `flutter analyze` and `flutter test` green (CI enforces this).
 
 ---
