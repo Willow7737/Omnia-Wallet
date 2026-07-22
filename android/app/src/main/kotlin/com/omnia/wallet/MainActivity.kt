@@ -1,4 +1,4 @@
-package com.omnia.omnia_wallet
+package com.omnia.wallet
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
