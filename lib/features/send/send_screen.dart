@@ -2,20 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../core/auth_mode.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
-import '../../core/widgets/hud.dart';
+import '../../core/theme.dart';
+import '../../core/ui/avatar.dart';
+import '../../core/ui/button.dart';
+import '../../core/ui/header.dart';
+import '../../core/ui/list_row.dart';
+import '../../core/ui/press.dart';
+import '../../core/ui/sheet.dart';
+import '../../core/ui/states.dart';
+import '../../data/contact.dart';
 import '../../data/payment_request.dart';
 import '../../state/contacts.dart';
 import '../../state/notices.dart';
 import '../../state/providers.dart';
 import '../contacts/contacts_screen.dart';
-import 'scan_did_screen.dart';
 
+/// Spend UBC.
+///
+/// Amount-first: the figure you are sending is the largest thing on the page
+/// and sits above the fold, with the recipient directly beneath it and the
+/// primary action docked above the keyboard. Confirmation is a sheet.
 class SendScreen extends ConsumerStatefulWidget {
   const SendScreen({super.key});
 
@@ -24,14 +37,21 @@ class SendScreen extends ConsumerStatefulWidget {
 }
 
 class _SendScreenState extends ConsumerState<SendScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _toDidController = TextEditingController();
   final _amountController = TextEditingController();
   bool _busy = false;
+  String? _didError;
+  String? _amountError;
 
-  /// Latest known spendable balance (from balanceProvider), for validation
-  /// and the "remaining after send" hint.
+  /// Latest known spendable balance, for validation and the remaining hint.
   int? _available;
+
+  @override
+  void initState() {
+    super.initState();
+    _toDidController.addListener(_onChanged);
+    _amountController.addListener(_onChanged);
+  }
 
   @override
   void dispose() {
@@ -40,46 +60,57 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     super.dispose();
   }
 
-  String? _validateDid(String? v) {
-    final value = (v ?? '').trim();
-    if (value.isEmpty) return 'Enter a recipient DID';
-    if (!value.startsWith('did:omnia:')) {
-      return 'DID must start with did:omnia:';
+  /// Clear stale errors as soon as the user starts fixing them — an error that
+  /// outlives the mistake reads as the field being permanently broken.
+  void _onChanged() {
+    if (!mounted) return;
+    setState(() {
+      _didError = null;
+      _amountError = null;
+    });
+  }
+
+  int get _amount => int.tryParse(_amountController.text.trim()) ?? 0;
+  String get _toDid => _toDidController.text.trim();
+
+  bool get _canSubmit =>
+      _toDid.startsWith('did:omnia:') &&
+      _amount > 0 &&
+      (_available == null || _amount <= _available!);
+
+  String? _validateDid() {
+    if (_toDid.isEmpty) return 'Enter a recipient DID';
+    if (!_toDid.startsWith('did:omnia:')) {
+      return 'A DID must start with did:omnia:';
     }
     return null;
   }
 
-  String? _validateAmount(String? v) {
-    final n = int.tryParse((v ?? '').trim());
-    if (n == null || n <= 0) return 'Enter a positive whole number';
-    final bal = _available;
-    if (bal != null && n > bal) return 'You only have ${Fmt.ubc(bal)}';
+  String? _validateAmount() {
+    if (_amount <= 0) return 'Enter a positive whole number';
+    if (_available != null && _amount > _available!) {
+      return 'You only have ${Fmt.ubc(_available!)}';
+    }
     return null;
   }
 
-  /// Apply a scanned/pasted payment request: fill the recipient, and prefill
-  /// the amount when the request carried one.
+  /// Apply a scanned or pasted payment request: fill the recipient, and
+  /// prefill the amount when the request carried one.
   void _applyRequest(PaymentRequest request) {
     Haptics.selection();
     _toDidController.text = request.did;
     if (request.amount != null) {
       _amountController.text = request.amount.toString();
     }
-    setState(() {});
   }
 
-  Future<void> _scanDid() async {
+  Future<void> _scan() async {
     Haptics.medium();
-    final request = await Navigator.of(context).push<PaymentRequest>(
-      MaterialPageRoute(builder: (_) => const ScanDidScreen()),
-    );
-    if (request != null) {
-      _applyRequest(request);
-    }
+    final request = await context.push<PaymentRequest>('/scan');
+    if (request != null) _applyRequest(request);
   }
 
   Future<void> _pickContact() async {
-    Haptics.light();
     final did = await showContactPicker(context, ref);
     if (did != null) {
       Haptics.selection();
@@ -88,40 +119,38 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   }
 
   Future<void> _paste() async {
-    final data = await Clipboard.getData('text/plain');
-    final text = data?.text;
-    if (text == null) return;
+    final text = (await Clipboard.getData('text/plain'))?.text;
+    if (text == null || !mounted) return;
     // A pasted payment request (omnia:did?amount=…) prefills the amount too;
     // anything else drops into the recipient field as-is.
     final request = PaymentRequest.parse(text);
     if (request != null) {
       _applyRequest(request);
     } else {
+      Haptics.selection();
       _toDidController.text = text.trim();
     }
   }
 
   void _setMax() {
-    final bal = _available;
-    if (bal != null && bal > 0) {
-      Haptics.selection();
-      _amountController.text = bal.toString();
-    }
+    final balance = _available;
+    if (balance == null || balance <= 0) return;
+    Haptics.selection();
+    _amountController.text = balance.toString();
   }
 
-  String _signedByLine(WidgetRef ref) {
+  String _authorizationNote() {
     final mode =
-        ref.watch(authModeProvider).valueOrNull ?? AuthMode.selfCustody;
+        ref.read(authModeProvider).valueOrNull ?? AuthMode.selfCustody;
     return mode == AuthMode.supabase
-        ? 'Authorized through your Omnia account.'
-        : 'Signed on-device with your private key.';
+        ? 'Authorized through your Omnia account'
+        : 'Signed on-device with your private key';
   }
 
   Future<bool> _confirmWithBiometrics() async {
     final auth = LocalAuthentication();
     try {
-      final canCheck = await auth.isDeviceSupported();
-      if (!canCheck) return true; // no biometric hardware — allow
+      if (!await auth.isDeviceSupported()) return true; // no hardware — allow
       return auth.authenticate(
         localizedReason: 'Confirm to send UBC',
         options: const AuthenticationOptions(stickyAuth: true),
@@ -132,37 +161,54 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    final didError = _validateDid();
+    final amountError = _validateAmount();
+    if (didError != null || amountError != null) {
+      Haptics.error();
+      setState(() {
+        _didError = didError;
+        _amountError = amountError;
+      });
+      return;
+    }
 
-    final toDid = _toDidController.text.trim();
-    final amount = int.parse(_amountController.text.trim());
+    final toDid = _toDid;
+    final amount = _amount;
 
-    Haptics.medium();
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (_) => _ConfirmSheet(toDid: toDid, amount: amount),
+    final proceed = await showOmniaConfirm(
+      context,
+      icon: Iconsax.arrow_up_3_copy,
+      title: 'Send ${Fmt.ubc(amount)}?',
+      message: 'This spends the amount from your balance and cannot be undone.',
+      confirmLabel: 'Send ${Fmt.ubc(amount)}',
+      details: [
+        (label: 'To', value: Fmt.shortDid(toDid)),
+        (label: 'Amount', value: Fmt.ubc(amount)),
+        if (_available != null)
+          (label: 'Remaining', value: Fmt.ubc(_available! - amount)),
+      ],
     );
-    if (proceed != true) return;
+    if (!proceed || !mounted) return;
 
     if (!await _confirmWithBiometrics()) return;
     if (!mounted) return;
 
     setState(() => _busy = true);
     try {
-      // Blocking HUD: dimmed screen + centered spinner square while the
-      // transfer is in flight.
-      final result = await runWithHud(
+      final result = await runWithOverlay(
         context,
         () => ref
             .read(walletRepositoryProvider)
             .send(toDid: toDid, amount: amount),
+        message: 'Sending…',
       );
       ref.invalidate(balanceProvider);
       ref.invalidate(historyProvider);
+
       // When the wallet signed the transfer itself (self-custody), say so —
       // the spend was authorized by the on-device key, not just the session.
       final signedNote = result.isWalletSigned ? ' · signed on-device' : '';
-      ref.read(noticesProvider.notifier).add(
+      await ref.read(noticesProvider.notifier).add(
             type: NoticeType.sent,
             title: 'Sent ${Fmt.ubc(result.amount)}',
             body: 'To ${Fmt.shortDid(toDid)} · '
@@ -170,22 +216,16 @@ class _SendScreenState extends ConsumerState<SendScreen> {
           );
       if (!mounted) return;
       Haptics.success();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Sent ${Fmt.ubc(result.amount)} · '
-            'new balance ${Fmt.ubc(result.newBalance)}$signedNote',
-          ),
-        ),
+      showOmniaToast(
+        context,
+        message: 'Sent ${Fmt.ubc(result.amount)}',
+        icon: Iconsax.tick_circle,
       );
       context.pop();
     } catch (e) {
-      if (mounted) {
-        Haptics.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(e).message)),
-        );
-      }
+      if (!mounted) return;
+      Haptics.error();
+      showOmniaToast(context, message: friendlyError(e).message, error: true);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -193,185 +233,398 @@ class _SendScreenState extends ConsumerState<SendScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    // Keep the latest balance for validation / hints.
+    final o = context.omnia;
     _available = ref.watch(balanceProvider).valueOrNull?.balance;
-    final contacts = ref.watch(contactsProvider);
+
+    final did = _toDid;
+    final contact = did.isEmpty
+        ? null
+        : ref.watch(contactsProvider).where((c) => c.did == did).firstOrNull;
+    final isNewDid = did.startsWith('did:omnia:') && contact == null;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Send UBC')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SoulboundNotice(),
-              const SizedBox(height: 20),
-              TextFormField(
-                controller: _toDidController,
-                validator: _validateDid,
-                decoration: InputDecoration(
-                  labelText: 'Recipient DID',
-                  hintText: 'did:omnia:…',
-                  suffixIcon: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Contacts',
-                        icon: const Icon(Icons.contacts_outlined),
-                        onPressed: _pickContact,
-                      ),
-                      IconButton(
-                        tooltip: 'Scan QR',
-                        icon: const Icon(Icons.qr_code_scanner),
-                        onPressed: _scanDid,
-                      ),
-                      IconButton(
-                        tooltip: 'Paste',
-                        icon: const Icon(Icons.paste),
-                        onPressed: _paste,
-                      ),
-                    ],
+      backgroundColor: o.bg,
+      appBar: const OmniaHeader(title: 'Send'),
+      body: SafeArea(
+        top: false,
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.only(bottom: Space.xxl),
+                children: [
+                  _AmountField(
+                    controller: _amountController,
+                    available: _available,
+                    error: _amountError,
+                    onMax: _setMax,
                   ),
-                ),
-              ),
-              // Offer to save a freshly-entered DID that isn't a contact yet.
-              AnimatedBuilder(
-                animation: _toDidController,
-                builder: (context, _) {
-                  final did = _toDidController.text.trim();
-                  final known =
-                      ref.read(contactsProvider.notifier).byDid(did) != null;
-                  if (!did.startsWith('did:omnia:') || known) {
-                    return const SizedBox.shrink();
-                  }
-                  return Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () =>
-                          editContact(context, ref, presetDid: did),
-                      icon: const Icon(Icons.bookmark_add_outlined, size: 18),
-                      label: const Text('Save to contacts'),
+                  const Hairline(),
+                  _RecipientField(
+                    controller: _toDidController,
+                    contact: contact,
+                    error: _didError,
+                    onScan: _scan,
+                    onContacts: _pickContact,
+                    onPaste: _paste,
+                  ),
+                  if (isNewDid)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        Space.lg,
+                        0,
+                        Space.lg,
+                        Space.md,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: OmniaButton(
+                          label: 'Save to contacts',
+                          icon: Iconsax.user_add_copy,
+                          size: ButtonSize.tiny,
+                          color: ButtonColor.secondary,
+                          onPressed: () =>
+                              editContact(context, ref, presetDid: did),
+                        ),
+                      ),
                     ),
-                  );
-                },
+                  const Hairline(),
+                  const _SoulboundNotice(),
+                ],
               ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: _amountController,
-                validator: _validateAmount,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: 'Amount',
-                  suffixText: 'UBC',
-                  helperText: _available == null
-                      ? null
-                      : 'Available: ${Fmt.ubc(_available!)}',
-                  // NOTE: `suffix` + `suffixText` together is illegal in
-                  // Flutter; use `suffixIcon` for the Max action instead.
-                  suffixIcon: TextButton(
-                    onPressed: _available == null ? null : _setMax,
-                    child: const Text('Max'),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              _RemainingHint(
-                amountController: _amountController,
-                available: _available,
-              ),
-              const SizedBox(height: 20),
-              FilledButton(
-                onPressed: _busy ? null : _submit,
-                child: _busy
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Review & send'),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                contacts.isEmpty
-                    ? _signedByLine(ref)
-                    : '${_signedByLine(ref)} '
-                        'Tap the contacts icon to reuse a saved DID.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodySmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ],
-          ),
+            ),
+            // The primary action is docked above the keyboard rather than
+            // buried at the end of a scroll — the thing you came here to do
+            // should never require scrolling to reach.
+            _SubmitBar(
+              enabled: _canSubmit,
+              busy: _busy,
+              note: _authorizationNote(),
+              onSubmit: _submit,
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-/// Shows "Remaining after send" as the amount changes.
-class _RemainingHint extends StatelessWidget {
-  const _RemainingHint(
-      {required this.amountController, required this.available});
+// ---------------------------------------------------------------------------
+// Amount
+// ---------------------------------------------------------------------------
 
-  final TextEditingController amountController;
+/// The amount, typed directly at display size.
+///
+/// A wallet's amount field should never look like a form input, so this is a
+/// borderless, centred, display-scale field with a "Max" pill beside it.
+class _AmountField extends StatelessWidget {
+  const _AmountField({
+    required this.controller,
+    required this.available,
+    required this.error,
+    required this.onMax,
+  });
+
+  final TextEditingController controller;
   final int? available;
+  final String? error;
+  final VoidCallback onMax;
 
   @override
   Widget build(BuildContext context) {
-    if (available == null) return const SizedBox.shrink();
+    final o = context.omnia;
     final theme = Theme.of(context);
-    return AnimatedBuilder(
-      animation: amountController,
-      builder: (context, _) {
-        final amount = int.tryParse(amountController.text.trim()) ?? 0;
-        if (amount <= 0) return const SizedBox.shrink();
-        final remaining = available! - amount;
-        final over = remaining < 0;
-        return Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            over
-                ? 'Exceeds your balance by ${Fmt.ubc(-remaining)}'
-                : 'Remaining after send: ${Fmt.ubc(remaining)}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: over
-                  ? theme.colorScheme.error
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
+
+    return Padding(
+      padding:
+          const EdgeInsets.fromLTRB(Space.lg, Space.xl, Space.lg, Space.xl),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // IntrinsicWidth keeps the field exactly as wide as the digits,
+              // so the number + unit pair stays optically centred as it grows.
+              IntrinsicWidth(
+                child: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  textAlign: TextAlign.right,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    // Past nine digits the figure stops fitting at display
+                    // size, and no reachable balance needs more.
+                    LengthLimitingTextInputFormatter(9),
+                  ],
+                  style: theme.textTheme.displayMedium,
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: false,
+                    contentPadding: EdgeInsets.zero,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    hintText: '0',
+                    hintStyle: theme.textTheme.displayMedium
+                        ?.copyWith(color: o.borderHigh),
+                  ),
+                ),
+              ),
+              const SizedBox(width: Space.sm),
+              Text(
+                'UBC',
+                style:
+                    theme.textTheme.headlineMedium?.copyWith(color: o.textLow),
+              ),
+            ],
           ),
-        );
-      },
+          const SizedBox(height: Space.md),
+          if (error != null)
+            Text(
+              error!,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.sm,
+                fontWeight: Weights.medium,
+                color: o.negative,
+              ),
+            )
+          else
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Flexible so a long formatted balance yields to the Max
+                // button rather than pushing it off the edge.
+                Flexible(
+                  child: Text(
+                    available == null
+                        ? 'Checking balance…'
+                        : 'Available ${Fmt.ubc(available!)}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: FontSizes.sm,
+                      color: o.textLow,
+                      fontFeatures: kTabularFigures,
+                    ),
+                  ),
+                ),
+                if (available != null && available! > 0) ...[
+                  const SizedBox(width: Space.sm),
+                  OmniaButton(
+                    label: 'Max',
+                    size: ButtonSize.tiny,
+                    color: ButtonColor.secondary,
+                    onPressed: onMax,
+                  ),
+                ],
+              ],
+            ),
+        ],
+      ),
     );
   }
 }
 
-class _SoulboundNotice extends StatelessWidget {
+// ---------------------------------------------------------------------------
+// Recipient
+// ---------------------------------------------------------------------------
+
+class _RecipientField extends StatelessWidget {
+  const _RecipientField({
+    required this.controller,
+    required this.contact,
+    required this.error,
+    required this.onScan,
+    required this.onContacts,
+    required this.onPaste,
+  });
+
+  final TextEditingController controller;
+  final Contact? contact;
+  final String? error;
+  final VoidCallback onScan;
+  final VoidCallback onContacts;
+  final VoidCallback onPaste;
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(14),
+    final o = context.omnia;
+    final did = controller.text.trim();
+    final resolved = did.startsWith('did:omnia:');
+    final label = contact?.label ?? '';
+
+    return Padding(
+      padding:
+          const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'TO',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: FontSizes.xs,
+              fontWeight: Weights.bold,
+              letterSpacing: 0.6,
+              color: o.textLow,
+            ),
+          ),
+          const SizedBox(height: Space.sm),
+          Row(
+            children: [
+              // Resolving a DID to a face is the difference between hoping you
+              // pasted the right thing and knowing you did.
+              if (resolved)
+                Padding(
+                  padding: const EdgeInsets.only(right: Space.md),
+                  child: DidAvatar(did: did, size: 36),
+                ),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: FontSizes.md,
+                    fontWeight: Weights.medium,
+                    color: o.text,
+                  ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: false,
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: Space.sm),
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    hintText: 'did:omnia:…',
+                    errorText: error,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (label.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: Space.xs),
+              child: OmniaPill(
+                label: label,
+                icon: Iconsax.user_tick_copy,
+                color: o.accent,
+              ),
+            ),
+          const SizedBox(height: Space.md),
+          // Three labelled pills do not fit on one line on a narrow screen at
+          // large text sizes; Wrap lets the third drop rather than clip.
+          Wrap(
+            spacing: Space.sm,
+            runSpacing: Space.sm,
+            children: [
+              _RecipientAction(
+                icon: Iconsax.scan_barcode_copy,
+                label: 'Scan',
+                onTap: onScan,
+              ),
+              _RecipientAction(
+                icon: Iconsax.profile_2user_copy,
+                label: 'Contacts',
+                onTap: onContacts,
+              ),
+              _RecipientAction(
+                icon: Iconsax.copy_copy,
+                label: 'Paste',
+                onTap: onPaste,
+              ),
+            ],
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class _RecipientAction extends StatelessWidget {
+  const _RecipientAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.omnia;
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.md,
+          vertical: Space.sm,
+        ),
+        decoration: BoxDecoration(color: o.bg50, borderRadius: Radii.rFull),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: o.textMedium),
+            const SizedBox(width: Space.xs + 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.sm,
+                fontWeight: Weights.medium,
+                color: o.textHigh,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Footer
+// ---------------------------------------------------------------------------
+
+class _SoulboundNotice extends StatelessWidget {
+  const _SoulboundNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.omnia;
+    return Padding(
+      padding: const EdgeInsets.all(Space.lg),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, color: theme.colorScheme.onErrorContainer),
-          const SizedBox(width: 12),
+          Icon(Iconsax.info_circle_copy, size: 16, color: o.textLow),
+          const SizedBox(width: Space.md - 2),
           Expanded(
             child: Text(
               'UBC is soulbound. Sending spends (burns) tokens from your '
               'balance — the recipient DID is recorded for provenance but is '
-              'NOT credited the amount.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onErrorContainer),
+              'not credited the amount.',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.sm,
+                height: LineHeights.relaxed,
+                color: o.textLow,
+              ),
             ),
           ),
         ],
@@ -380,39 +633,64 @@ class _SoulboundNotice extends StatelessWidget {
   }
 }
 
-class _ConfirmSheet extends StatelessWidget {
-  const _ConfirmSheet({required this.toDid, required this.amount});
-  final String toDid;
-  final int amount;
+class _SubmitBar extends StatelessWidget {
+  const _SubmitBar({
+    required this.enabled,
+    required this.busy,
+    required this.note,
+    required this.onSubmit,
+  });
+
+  final bool enabled;
+  final bool busy;
+  final String note;
+  final VoidCallback onSubmit;
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Confirm send'),
-      content: Column(
+    final o = context.omnia;
+    return Container(
+      decoration: BoxDecoration(
+        color: o.bg,
+        border: Border(top: BorderSide(color: o.borderLow)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        Space.lg,
+        Space.md,
+        Space.lg,
+        Space.md + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Amount: ${Fmt.ubc(amount)}'),
-          const SizedBox(height: 8),
-          Text('To: $toDid'),
-          const SizedBox(height: 12),
-          const Text(
-            'This spends the amount from your balance and cannot be undone.',
-            style: TextStyle(fontWeight: FontWeight.w500),
+          OmniaButton(
+            label: 'Review & send',
+            expand: true,
+            loading: busy,
+            onPressed: enabled ? onSubmit : null,
+          ),
+          const SizedBox(height: Space.sm),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Iconsax.shield_tick_copy, size: 13, color: o.textLow),
+              const SizedBox(width: Space.xs + 1),
+              Flexible(
+                child: Text(
+                  note,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: FontSizes.xs,
+                    height: LineHeights.snug,
+                    color: o.textLow,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('Send'),
-        ),
-      ],
     );
   }
 }

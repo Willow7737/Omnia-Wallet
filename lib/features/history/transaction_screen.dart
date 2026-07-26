@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 import '../../core/format.dart';
 import '../../core/haptics.dart';
 import '../../core/theme.dart';
-import '../../core/widgets/fade_slide_in.dart';
+import '../../core/ui/avatar.dart';
+import '../../core/ui/button.dart';
+import '../../core/ui/header.dart';
+import '../../core/ui/list_row.dart';
+import '../../core/ui/press.dart';
+import '../../core/ui/sheet.dart';
+import '../../core/ui/states.dart';
 import '../../data/models.dart';
 import '../../state/providers.dart';
 
-/// Everything about one transfer: direction, amount, parties, timing, id.
+/// Everything about one transfer: direction, amount, parties, timing, ids.
 class TransactionScreen extends ConsumerWidget {
   const TransactionScreen({super.key, required this.record});
 
@@ -18,156 +25,179 @@ class TransactionScreen extends ConsumerWidget {
   void _copy(BuildContext context, String label, String value) {
     Haptics.selection();
     Clipboard.setData(ClipboardData(text: value));
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text('$label copied')));
+    showOmniaToast(context, message: '$label copied', icon: Iconsax.copy_success);
   }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final o = context.omnia;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final omnia = context.omnia;
     final myDid = ref.watch(identityProvider).valueOrNull?.did;
     final mine = myDid != null && record.fromDid == myDid;
+    final tint = mine ? o.negative : o.textMedium;
 
-    final tint = mine ? omnia.negative : scheme.onSurfaceVariant;
-    final ok = record.status.toLowerCase() == 'completed' ||
-        record.status.toLowerCase() == 'success';
+    final status = record.status.toLowerCase();
+    final ok = status == 'completed' || status == 'success';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Transaction')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        children: [
-          FadeSlideIn(
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 34,
-                  backgroundColor: tint.withValues(alpha: 0.14),
-                  child: Icon(
-                    mine ? Icons.arrow_upward : Icons.swap_horiz,
-                    color: tint,
-                    size: 32,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  mine ? '−${Fmt.ubc(record.amount)}' : Fmt.ubc(record.amount),
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: mine ? omnia.negative : scheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Status + provenance chips.
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _Chip(
-                      label: record.status.isEmpty ? 'recorded' : record.status,
-                      color: ok ? omnia.success : omnia.warning,
-                    ),
-                    // Lane 0 fast-path finality (only when the node tracks it).
-                    if (record.lane0Final != null)
-                      _Chip(
-                        label: record.lane0Final!
-                            ? 'Final · Lane 0'
-                            : 'Awaiting finality',
-                        color: record.lane0Final! ? omnia.success : tint,
-                        icon: record.lane0Final!
-                            ? Icons.bolt
-                            : Icons.hourglass_empty,
-                      ),
-                    // On-device signature (self-sovereign spend).
-                    if (record.isWalletSigned)
-                      _Chip(
-                        label: 'Signed on-device',
-                        color: scheme.primary,
-                        icon: Icons.verified_user_outlined,
-                      ),
-                  ],
-                ),
-              ],
+      backgroundColor: o.bg,
+      appBar: OmniaHeader(
+        title: 'Transaction',
+        actions: [
+          if (record.id.isNotEmpty)
+            OmniaIconButton(
+              icon: Iconsax.copy_copy,
+              tooltip: 'Copy transaction ID',
+              onTap: () => _copy(context, 'Transaction ID', record.id),
             ),
-          ),
-          const SizedBox(height: 24),
-          FadeSlideIn(
-            delay: const Duration(milliseconds: 40),
-            child: Card(
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.only(bottom: Space.x4l),
+        children: [
+          // ---- hero ----
+          FadeIn(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Space.xl,
+                Space.xl,
+                Space.xl,
+                Space.xxl,
+              ),
               child: Column(
                 children: [
-                  _Row(
-                    label: 'From',
-                    value: Fmt.shortDid(record.fromDid),
-                    badge: mine ? 'You' : null,
-                    onTap: () => _copy(context, 'Sender DID', record.fromDid),
+                  IconAvatar(
+                    icon: mine
+                        ? Iconsax.arrow_up_3_copy
+                        : Iconsax.arrow_swap_horizontal_copy,
+                    tint: tint,
+                    size: 64,
+                    iconSize: 28,
                   ),
-                  const Divider(height: 1),
-                  _Row(
-                    label: 'To',
-                    value: Fmt.shortDid(record.toDid),
-                    badge:
-                        myDid != null && record.toDid == myDid ? 'You' : null,
-                    onTap: () => _copy(context, 'Recipient DID', record.toDid),
-                  ),
-                  const Divider(height: 1),
-                  _Row(
-                    label: 'Date',
-                    value: Fmt.dateTime(record.dateTime),
-                  ),
-                  const Divider(height: 1),
-                  _Row(
-                    label: 'Authorization',
-                    value: record.isWalletSigned
-                        ? 'Signed on-device with your key'
-                        : 'Authorized by session (node-attested)',
-                  ),
-                  if (record.id.isNotEmpty) ...[
-                    const Divider(height: 1),
-                    _Row(
-                      label: 'Transaction ID',
-                      value: record.id.length > 18
-                          ? '${record.id.substring(0, 8)}…'
-                              '${record.id.substring(record.id.length - 8)}'
-                          : record.id,
-                      onTap: () => _copy(context, 'Transaction ID', record.id),
+                  const SizedBox(height: Space.lg),
+                  Text(
+                    mine
+                        ? '−${Fmt.ubc(record.amount)}'
+                        : Fmt.ubc(record.amount),
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      color: mine ? o.negative : o.text,
                     ),
-                  ],
-                  if (record.eventId != null && record.eventId!.isNotEmpty) ...[
-                    const Divider(height: 1),
-                    _Row(
-                      label: 'On-chain event',
-                      value: record.eventId!.length > 18
-                          ? '${record.eventId!.substring(0, 8)}…'
-                              '${record.eventId!.substring(record.eventId!.length - 8)}'
-                          : record.eventId!,
-                      onTap: () => _copy(context, 'Event ID', record.eventId!),
-                    ),
-                  ],
-                  if (mine) ...[
-                    const Divider(height: 1),
-                    _Row(
-                      label: 'Balance after',
-                      value: Fmt.ubc(record.newBalance),
-                    ),
-                  ],
+                  ),
+                  const SizedBox(height: Space.xs),
+                  Text(
+                    Fmt.dateTime(record.dateTime),
+                    style: theme.textTheme.bodySmall?.copyWith(color: o.textLow),
+                  ),
+                  const SizedBox(height: Space.lg),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: Space.sm,
+                    runSpacing: Space.sm,
+                    children: [
+                      OmniaPill(
+                        label: record.status.isEmpty
+                            ? 'recorded'
+                            : record.status,
+                        icon: ok ? Iconsax.tick_circle : Iconsax.clock_copy,
+                        color: ok ? o.positive : o.warning,
+                      ),
+                      // Lane 0 fast-path finality — only when the node
+                      // actually tracks it.
+                      if (record.lane0Final != null)
+                        OmniaPill(
+                          label: record.lane0Final!
+                              ? 'Final · Lane 0'
+                              : 'Awaiting finality',
+                          icon: record.lane0Final!
+                              ? Iconsax.flash_1
+                              : Iconsax.timer_copy,
+                          color: record.lane0Final! ? o.positive : o.textMedium,
+                        ),
+                      // Authorized by the on-device key, not just the session.
+                      if (record.isWalletSigned)
+                        OmniaPill(
+                          label: 'Signed on-device',
+                          icon: Iconsax.shield_tick,
+                          color: o.accent,
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          FadeSlideIn(
-            delay: const Duration(milliseconds: 80),
-            child: Text(
-              'UBC is soulbound: this transfer spent (burned) the amount from '
-              'the sender\'s balance; the recipient DID is recorded for '
-              'provenance.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+
+          // ---- parties ----
+          const Hairline(),
+          _Party(
+            role: 'From',
+            did: record.fromDid,
+            isYou: mine,
+            onCopy: () => _copy(context, 'Sender DID', record.fromDid),
+          ),
+          const Hairline(indent: Space.lg),
+          _Party(
+            role: 'To',
+            did: record.toDid,
+            isYou: myDid != null && record.toDid == myDid,
+            onCopy: () => _copy(context, 'Recipient DID', record.toDid),
+          ),
+          const Hairline(),
+
+          // ---- details ----
+          const OmniaSectionLabel('Details'),
+          _Detail(
+            label: 'Authorization',
+            value: record.isWalletSigned
+                ? 'Signed on-device with your key'
+                : 'Authorized by session (node-attested)',
+          ),
+          const Hairline(indent: Space.lg),
+          _Detail(label: 'Date', value: Fmt.dateTime(record.dateTime)),
+          if (record.id.isNotEmpty) ...[
+            const Hairline(indent: Space.lg),
+            _Detail(
+              label: 'Transaction ID',
+              value: Fmt.shortId(record.id),
+              mono: true,
+              onCopy: () => _copy(context, 'Transaction ID', record.id),
+            ),
+          ],
+          if (record.eventId != null && record.eventId!.isNotEmpty) ...[
+            const Hairline(indent: Space.lg),
+            _Detail(
+              label: 'On-chain event',
+              value: Fmt.shortId(record.eventId!),
+              mono: true,
+              onCopy: () => _copy(context, 'Event ID', record.eventId!),
+            ),
+          ],
+          if (mine) ...[
+            const Hairline(indent: Space.lg),
+            _Detail(
+              label: 'Balance after',
+              value: Fmt.ubc(record.newBalance),
+            ),
+          ],
+          const Hairline(),
+
+          Padding(
+            padding: const EdgeInsets.all(Space.lg),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Iconsax.info_circle_copy, size: 16, color: o.textLow),
+                const SizedBox(width: Space.md - 2),
+                Expanded(
+                  child: Text(
+                    'UBC is soulbound: this transfer spent (burned) the amount '
+                    'from the sender\'s balance. The recipient DID is recorded '
+                    'for provenance.',
+                    style:
+                        theme.textTheme.bodySmall?.copyWith(color: o.textLow),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -176,102 +206,132 @@ class TransactionScreen extends ConsumerWidget {
   }
 }
 
-/// A small pill used for status / finality / signing indicators.
-class _Chip extends StatelessWidget {
-  const _Chip({required this.label, required this.color, this.icon});
+/// A counterparty row: identicon, role, DID, and a "You" marker when it's the
+/// signed-in wallet.
+class _Party extends StatelessWidget {
+  const _Party({
+    required this.role,
+    required this.did,
+    required this.isYou,
+    required this.onCopy,
+  });
 
-  final String label;
-  final Color color;
-  final IconData? icon;
+  final String role;
+  final String did;
+  final bool isYou;
+  final VoidCallback onCopy;
 
   @override
   Widget build(BuildContext context) {
+    final o = context.omnia;
     final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
+
+    return Pressable(
+      onTap: onCopy,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.lg,
+          vertical: Space.md + 2,
+        ),
+        child: Row(
+          children: [
+            DidAvatar(did: did, size: 40),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        role,
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(color: o.textLow),
+                      ),
+                      if (isYou) ...[
+                        const SizedBox(width: Space.sm),
+                        OmniaPill(label: 'You', color: o.accent),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    Fmt.shortDid(did),
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: FontSizes.sm,
+                      color: o.text,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Iconsax.copy_copy, size: 17, color: o.textLow),
           ],
-          Text(
-            label,
-            style: theme.textTheme.labelMedium
-                ?.copyWith(color: color, fontWeight: FontWeight.w700),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _Row extends StatelessWidget {
-  const _Row({
+class _Detail extends StatelessWidget {
+  const _Detail({
     required this.label,
     required this.value,
-    this.badge,
-    this.onTap,
+    this.mono = false,
+    this.onCopy,
   });
 
   final String label;
   final String value;
-  final String? badge;
-  final VoidCallback? onTap;
+  final bool mono;
+  final VoidCallback? onCopy;
 
   @override
   Widget build(BuildContext context) {
+    final o = context.omnia;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return ListTile(
-      dense: true,
-      title: Text(
-        label,
-        style: theme.textTheme.labelMedium
-            ?.copyWith(color: scheme.onSurfaceVariant),
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 2),
+
+    return Pressable(
+      onTap: onCopy,
+      haptic: onCopy != null,
+      feel: onCopy == null ? PressFeel.none : PressFeel.normal,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.lg,
+          vertical: Space.md + 2,
+        ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Flexible(
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(color: o.textMedium),
+            ),
+            const SizedBox(width: Space.xl),
+            Expanded(
               child: Text(
                 value,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
+                textAlign: TextAlign.right,
+                style: mono
+                    ? TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: FontSizes.sm,
+                        color: o.text,
+                      )
+                    : theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: Weights.medium,
+                        fontFeatures: kTabularFigures,
+                      ),
               ),
             ),
-            if (badge != null) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-                decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: 0.14),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  badge!,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+            if (onCopy != null) ...[
+              const SizedBox(width: Space.sm),
+              Icon(Iconsax.copy_copy, size: 15, color: o.textLow),
             ],
           ],
         ),
       ),
-      trailing:
-          onTap == null ? null : const Icon(Icons.copy_outlined, size: 17),
-      onTap: onTap,
     );
   }
 }

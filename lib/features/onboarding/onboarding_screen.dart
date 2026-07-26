@@ -3,19 +3,24 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 import '../../core/brand/brand.dart';
 import '../../core/haptics.dart';
-import '../../core/widgets/fade_slide_in.dart';
-import '../../core/widgets/method_card.dart';
+import '../../core/motion.dart';
+import '../../core/theme.dart';
+import '../../core/ui/button.dart';
+import '../../core/ui/press.dart';
+import '../../core/ui/sheet.dart';
+import '../../core/ui/states.dart';
 import '../../state/providers.dart';
 
-/// First-run flow, in two phases:
-///  1. **Slides** — a swipeable intro (Skip top-right, dots, Next/Get started)
-///     with collage-style illustrations.
-///  2. **Methods** — create / import / sign in.
+/// First run, in two phases:
+///
+///  1. **Slides** — a swipeable intro with full-bleed photography, a Skip pill
+///     floating over it, dots on the left and a pill button on the right.
+///  2. **Methods** — create / import / sign in, over the brand halo.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -25,6 +30,7 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 
 class _Slide {
   const _Slide({required this.asset, required this.title, required this.body});
+
   final String asset;
   final String title;
   final String body;
@@ -80,10 +86,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       return;
     }
     Haptics.light();
-    _pageController.nextPage(
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-    );
+    _pageController.nextPage(duration: Motion.normal, curve: Motion.enter);
   }
 
   Future<void> _create() async {
@@ -92,11 +95,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     try {
       final mnemonic = await ref.read(authRepositoryProvider).createWallet();
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => _RecoveryDialog(mnemonic: mnemonic),
+      final saved = await showOmniaSheet<bool>(
+        context,
+        title: 'Your recovery phrase',
+        subtitle: 'Write these 12 words down in order and keep them offline. '
+            'Anyone with this phrase controls your wallet — it is the only '
+            'way to recover it.',
+        dismissible: false,
+        scrollable: true,
+        initialSize: 0.78,
+        builder: (_) => _RecoveryBody(mnemonic: mnemonic),
       );
+      if (saved != true) return;
       _finish();
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -104,20 +114,30 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 
   Future<void> _import() async {
-    Haptics.light();
-    final phrase = await showDialog<String>(
-      context: context,
-      builder: (_) => const _ImportDialog(),
+    final phrase = await showOmniaInput(
+      context,
+      title: 'Import a wallet',
+      subtitle: 'Enter your 12-word recovery phrase, separated by spaces.',
+      hintText: 'ability absent ocean …',
+      confirmLabel: 'Import',
+      maxLines: 3,
+      validator: (v) {
+        final words = v.split(RegExp(r'\s+')).where((w) => w.isNotEmpty);
+        if (words.length != 12) return 'A recovery phrase is exactly 12 words';
+        return null;
+      },
     );
-    if (phrase == null) return;
+    if (phrase == null || !mounted) return;
+
     setState(() => _busy = true);
     try {
       await ref.read(authRepositoryProvider).importWallet(phrase);
+      Haptics.success();
       _finish();
     } on FormatException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.message)));
+        Haptics.error();
+        showOmniaToast(context, message: e.message, error: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -133,10 +153,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // No top SafeArea in the slides phase: the photo bleeds under the
-      // status bar to the very top edge of the screen.
+      backgroundColor: context.omnia.bg,
+      // No top SafeArea in the slides phase: the photo bleeds under the status
+      // bar to the very top edge.
       body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
+        duration: Motion.normal,
+        switchInCurve: Motion.enter,
         child: _showMethods
             ? SafeArea(child: _buildMethods(context))
             : _buildSlides(context),
@@ -147,10 +169,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   // ---- Phase 1: slides ----
 
   Widget _buildSlides(BuildContext context) {
+    final o = context.omnia;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
     final isLast = _index == _slides.length - 1;
-    final imageHeight = MediaQuery.sizeOf(context).height * 0.46;
+    final imageHeight = MediaQuery.sizeOf(context).height * 0.48;
 
     return Stack(
       key: const ValueKey('slides'),
@@ -162,7 +184,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 controller: _pageController,
                 itemCount: _slides.length,
                 onPageChanged: (i) {
-                  Haptics.selection();
+                  // Throttled: a fast swipe fires this several times as the
+                  // page settles, which without the throttle is a buzz.
+                  Haptics.tick();
                   setState(() => _index = i);
                 },
                 itemBuilder: (context, i) {
@@ -170,9 +194,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Full-bleed photo from the top edge down to just
-                      // above the title, dissolving into the background so
-                      // the text sits on calm ground.
                       SizedBox(
                         height: imageHeight,
                         width: double.infinity,
@@ -180,44 +201,37 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           fit: StackFit.expand,
                           children: [
                             Image.asset(slide.asset, fit: BoxFit.cover),
+                            // Dissolve the photo into the page so the text
+                            // below sits on calm ground.
                             DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
-                                  stops: const [0.55, 1.0],
-                                  colors: [
-                                    Colors.transparent,
-                                    scheme.surface,
-                                  ],
+                                  stops: const [0.5, 1.0],
+                                  colors: [Colors.transparent, o.bg],
                                 ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: Space.lg),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 28),
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: Space.xxl),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               slide.title,
-                              style: theme.textTheme.headlineMedium?.copyWith(
-                                fontSize: 32,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.6,
-                                height: 1.1,
-                              ),
+                              style: theme.textTheme.displaySmall,
                             ),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: Space.md),
                             Text(
                               slide.body,
-                              style: theme.textTheme.bodyLarge?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                                height: 1.45,
-                              ),
+                              style: theme.textTheme.bodyLarge
+                                  ?.copyWith(color: o.textMedium),
                             ),
                           ],
                         ),
@@ -227,41 +241,35 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 },
               ),
             ),
-            // Bottom control row: dots on the left, a compact pill button
-            // on the right (Bluesky-style).
+            // Dots on the left, a pill button on the right.
             SafeArea(
               top: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(28, 8, 24, 16),
+                padding: const EdgeInsets.fromLTRB(
+                  Space.xxl,
+                  Space.sm,
+                  Space.xl,
+                  Space.lg,
+                ),
                 child: Row(
                   children: [
                     for (var i = 0; i < _slides.length; i++)
                       AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOut,
-                        margin: const EdgeInsets.only(right: 7),
-                        width: i == _index ? 22 : 8,
-                        height: 8,
+                        duration: Motion.fast,
+                        curve: Motion.standard,
+                        margin: const EdgeInsets.only(right: 6),
+                        width: i == _index ? 20 : 7,
+                        height: 7,
                         decoration: BoxDecoration(
-                          color: i == _index
-                              ? scheme.primary
-                              : scheme.outlineVariant,
-                          borderRadius: BorderRadius.circular(4),
+                          color: i == _index ? o.accent : o.borderHigh,
+                          borderRadius: Radii.rFull,
                         ),
                       ),
                     const Spacer(),
-                    FilledButton(
+                    OmniaButton(
+                      label: isLast ? 'Get started' : 'Next',
+                      trailingIcon: isLast ? null : Iconsax.arrow_right_3,
                       onPressed: _next,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size(0, 46),
-                        padding: const EdgeInsets.symmetric(horizontal: 28),
-                        shape: const StadiumBorder(),
-                        textStyle: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                        ),
-                      ),
-                      child: Text(isLast ? 'Get started' : 'Next'),
                     ),
                   ],
                 ),
@@ -272,26 +280,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         // Skip: a frosted pill floating over the photo.
         Positioned(
           top: 0,
-          right: 16,
+          right: Space.lg,
           child: SafeArea(
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(999),
+              borderRadius: Radii.rFull,
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                child: Material(
-                  color: Colors.black.withValues(alpha: 0.28),
-                  child: InkWell(
-                    onTap: _toMethods,
-                    child: const Padding(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 18, vertical: 9),
-                      child: Text(
-                        'Skip',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
+                child: Pressable(
+                  onTap: _toMethods,
+                  feel: PressFeel.subtle,
+                  semanticLabel: 'Skip',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Space.lg,
+                      vertical: Space.sm,
+                    ),
+                    color: OmniaPalette.black.withValues(alpha: 0.3),
+                    child: const Text(
+                      'Skip',
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        color: OmniaPalette.white,
+                        fontWeight: Weights.semiBold,
+                        fontSize: FontSizes.sm,
                       ),
                     ),
                   ),
@@ -304,83 +315,90 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  // ---- Phase 2: choose a sign-in method ----
+  // ---- Phase 2: choose a method ----
 
   Widget _buildMethods(BuildContext context) {
+    final o = context.omnia;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+
     return SingleChildScrollView(
       key: const ValueKey('methods'),
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      padding: const EdgeInsets.fromLTRB(
+        Space.xxl,
+        Space.sm,
+        Space.xxl,
+        Space.xxl,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Hero: brand mark over a soft halftone/blue glow illustration.
-          FadeSlideIn(
+          FadeIn(
             child: SizedBox(
               height: 200,
               child: Stack(
                 alignment: Alignment.center,
                 children: [
-                  SvgPicture.asset(
-                    'assets/illustrations/hero_dots.svg',
-                    height: 260,
-                  ),
-                  const BrandMark(size: 96),
+                  const BrandHalo(size: 260),
+                  BrandMark(size: 76, color: o.text),
                 ],
               ),
             ),
           ),
-          FadeSlideIn(
+          FadeIn(
             delay: const Duration(milliseconds: 60),
-            child: Center(
-              child: Text('omnia', style: theme.textTheme.displaySmall),
+            child: Text(
+              'omnia',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.displaySmall,
             ),
           ),
-          const SizedBox(height: 8),
-          FadeSlideIn(
+          const SizedBox(height: Space.sm),
+          FadeIn(
             delay: const Duration(milliseconds: 100),
             child: Text(
               'How would you like to start?',
               textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge
-                  ?.copyWith(color: scheme.onSurfaceVariant),
+              style: theme.textTheme.bodyLarge?.copyWith(color: o.textMedium),
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: Space.x4l),
           if (_busy)
             const Center(
               child: Padding(
-                padding: EdgeInsets.all(16),
+                padding: EdgeInsets.all(Space.lg),
                 child: CircularProgressIndicator(),
               ),
             )
           else ...[
-            MethodCard(
-              icon: Icons.add_circle_outline,
-              title: 'Create a new wallet',
-              subtitle: 'Generate a fresh recovery phrase',
-              primary: true,
-              onTap: _create,
+            FadeIn(
+              delay: const Duration(milliseconds: 140),
+              child: MethodCard(
+                icon: Iconsax.add_circle_copy,
+                title: 'Create a new wallet',
+                subtitle: 'Generate a fresh recovery phrase',
+                primary: true,
+                onTap: _create,
+              ),
             ),
-            const SizedBox(height: 12),
-            MethodCard(
-              icon: Icons.download_outlined,
-              title: 'Import from recovery phrase',
-              subtitle: 'Restore an existing wallet',
-              primary: false,
-              onTap: _import,
+            const SizedBox(height: Space.md),
+            FadeIn(
+              delay: const Duration(milliseconds: 180),
+              child: MethodCard(
+                icon: Iconsax.import_1,
+                title: 'Import from recovery phrase',
+                subtitle: 'Restore an existing wallet',
+                onTap: _import,
+              ),
             ),
-            const SizedBox(height: 12),
-            MethodCard(
-              icon: Icons.person_outline,
-              title: 'Sign in with your Omnia account',
-              subtitle: 'Google, GitHub, or email — from the web app',
-              primary: false,
-              onTap: () {
-                Haptics.light();
-                context.push('/signin');
-              },
+            const SizedBox(height: Space.md),
+            FadeIn(
+              delay: const Duration(milliseconds: 220),
+              child: MethodCard(
+                icon: Iconsax.user_copy,
+                title: 'Sign in with your Omnia account',
+                subtitle: 'Google, GitHub, or email — from the web app',
+                onTap: () => context.push('/signin'),
+              ),
             ),
           ],
         ],
@@ -389,105 +407,250 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   }
 }
 
-class _RecoveryDialog extends StatefulWidget {
-  const _RecoveryDialog({required this.mnemonic});
-  final String mnemonic;
+/// A tappable "how do you want to start" option.
+///
+/// Shared with the sign-in screen. [leading] takes a real brand logo where one
+/// exists; otherwise [icon] is drawn in the same slot.
+class MethodCard extends StatelessWidget {
+  const MethodCard({
+    super.key,
+    this.icon,
+    this.leading,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.primary = false,
+  }) : assert(
+          icon != null || leading != null,
+          'Provide an icon or a custom leading widget',
+        );
 
-  @override
-  State<_RecoveryDialog> createState() => _RecoveryDialogState();
-}
+  final IconData? icon;
 
-class _RecoveryDialogState extends State<_RecoveryDialog> {
-  bool _confirmed = false;
+  /// Wins over [icon] — for a real brand mark.
+  final Widget? leading;
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  /// The recommended path: filled with the accent instead of outlined.
+  final bool primary;
 
   @override
   Widget build(BuildContext context) {
-    final words = widget.mnemonic.split(' ');
-    return AlertDialog(
-      title: const Text('Your recovery phrase'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+    final o = context.omnia;
+    final theme = Theme.of(context);
+    final fg = primary ? OmniaPalette.white : o.text;
+    final sub = primary
+        ? OmniaPalette.white.withValues(alpha: 0.82)
+        : o.textLow;
+
+    return Pressable(
+      onTap: onTap,
+      feel: PressFeel.firm,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.lg,
+          vertical: Space.lg,
+        ),
+        decoration: BoxDecoration(
+          color: primary ? o.accent : Colors.transparent,
+          borderRadius: Radii.rLg,
+          border: primary ? null : Border.all(color: o.borderMedium),
+        ),
+        child: Row(
           children: [
-            const Text(
-              'Write these 12 words down in order and keep them offline. '
-              'Anyone with this phrase controls your wallet. It is the only '
-              'way to recover it.',
+            leading ?? Icon(icon, color: fg, size: 22),
+            const SizedBox(width: Space.md + 2),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(color: fg),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(color: sub),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (var i = 0; i < words.length; i++)
-                  Chip(label: Text('${i + 1}. ${words[i]}')),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: () =>
-                  Clipboard.setData(ClipboardData(text: widget.mnemonic)),
-              icon: const Icon(Icons.copy, size: 18),
-              label: const Text('Copy'),
-            ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              value: _confirmed,
-              onChanged: (v) => setState(() => _confirmed = v ?? false),
-              title: const Text('I have saved my recovery phrase'),
-            ),
+            const SizedBox(width: Space.sm),
+            Icon(Iconsax.arrow_right_3, size: 16, color: sub),
           ],
         ),
       ),
-      actions: [
-        FilledButton(
-          onPressed: _confirmed ? () => Navigator.of(context).pop() : null,
-          child: const Text('Continue'),
-        ),
-      ],
     );
   }
 }
 
-class _ImportDialog extends StatefulWidget {
-  const _ImportDialog();
+// ---------------------------------------------------------------------------
+// Recovery phrase
+// ---------------------------------------------------------------------------
+
+/// The one screen in the app that must not be skimmed: 12 numbered words, a
+/// copy affordance, and a confirmation checkbox that gates Continue.
+class _RecoveryBody extends StatefulWidget {
+  const _RecoveryBody({required this.mnemonic});
+
+  final String mnemonic;
 
   @override
-  State<_ImportDialog> createState() => _ImportDialogState();
+  State<_RecoveryBody> createState() => _RecoveryBodyState();
 }
 
-class _ImportDialogState extends State<_ImportDialog> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
+class _RecoveryBodyState extends State<_RecoveryBody> {
+  bool _confirmed = false;
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Import wallet'),
-      content: TextField(
-        controller: _controller,
-        maxLines: 3,
-        autofocus: true,
-        decoration: const InputDecoration(
-          hintText: 'Enter your 12-word recovery phrase',
-        ),
+    final o = context.omnia;
+    final words = widget.mnemonic.split(' ');
+
+    return SingleChildScrollView(
+      primary: true,
+      padding: sheetBodyPadding(context),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            spacing: Space.sm,
+            runSpacing: Space.sm,
+            children: [
+              for (var i = 0; i < words.length; i++)
+                _WordChip(index: i + 1, word: words[i]),
+            ],
+          ),
+          const SizedBox(height: Space.lg),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OmniaButton(
+              label: 'Copy phrase',
+              icon: Iconsax.copy_copy,
+              size: ButtonSize.small,
+              color: ButtonColor.secondary,
+              onPressed: () {
+                Haptics.warning();
+                Clipboard.setData(ClipboardData(text: widget.mnemonic));
+                showOmniaToast(
+                  context,
+                  message: 'Copied — clear your clipboard afterwards',
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: Space.xl),
+          Pressable(
+            onTap: () => setState(() => _confirmed = !_confirmed),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: Motion.micro,
+                  width: 22,
+                  height: 22,
+                  decoration: BoxDecoration(
+                    color: _confirmed ? o.accent : Colors.transparent,
+                    borderRadius: Radii.rXs,
+                    border: Border.all(
+                      color: _confirmed ? o.accent : o.borderHigh,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: _confirmed
+                      ? const Icon(
+                          Iconsax.tick_circle,
+                          size: 15,
+                          color: OmniaPalette.white,
+                        )
+                      : null,
+                ),
+                const SizedBox(width: Space.md),
+                Expanded(
+                  child: Text(
+                    'I have written down my recovery phrase',
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: FontSizes.md,
+                      color: o.text,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Space.xl),
+          OmniaButton(
+            label: 'Continue',
+            expand: true,
+            onPressed: _confirmed
+                ? () {
+                    Haptics.success();
+                    Navigator.of(context).pop(true);
+                  }
+                : null,
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.of(context).pop(_controller.text.trim()),
-          child: const Text('Import'),
-        ),
-      ],
+    );
+  }
+}
+
+class _WordChip extends StatelessWidget {
+  const _WordChip({required this.index, required this.word});
+
+  final int index;
+  final String word;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.omnia;
+    // Three per row, computed against the sheet's own horizontal padding.
+    final width =
+        (MediaQuery.sizeOf(context).width - Space.xl * 2 - Space.sm * 2) / 3;
+
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.md,
+        vertical: Space.sm + 2,
+      ),
+      decoration: BoxDecoration(
+        color: o.bg25,
+        borderRadius: Radii.rSm,
+        border: Border.all(color: o.borderLow),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 18,
+            child: Text(
+              '$index',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.xs,
+                fontWeight: Weights.semiBold,
+                color: o.textLow,
+                fontFeatures: kTabularFigures,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              word,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: FontSizes.sm,
+                color: o.text,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

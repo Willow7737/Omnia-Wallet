@@ -107,6 +107,19 @@ class SecureStore {
   Future<void> saveAvatarPath(String path) async =>
       _storage.write(key: AppConfig.kAvatarPathKey, value: path);
 
+  /// Appearance preference (Light / Dim / Dark). Unset means "dim".
+  Future<String?> readTheme() async => _storage.read(key: AppConfig.kThemeKey);
+
+  Future<void> saveTheme(String name) async =>
+      _storage.write(key: AppConfig.kThemeKey, value: name);
+
+  /// Haptic feedback preference. Unset means enabled.
+  Future<bool> readHapticsEnabled() async =>
+      (await _storage.read(key: AppConfig.kHapticsKey)) != 'false';
+
+  Future<void> saveHapticsEnabled(bool enabled) async =>
+      _storage.write(key: AppConfig.kHapticsKey, value: enabled.toString());
+
   /// Irreversibly wipe all wallet material from the device.
   Future<void> wipe() async {
     await _storage.delete(key: AppConfig.kSeedKey);

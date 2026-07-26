@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/auth_mode.dart';
@@ -9,16 +10,25 @@ import '../../core/brand/identicon.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
+import '../../core/theme.dart';
+import '../../core/ui/button.dart';
+import '../../core/ui/header.dart';
+import '../../core/ui/list_row.dart';
+import '../../core/ui/press.dart';
+import '../../core/ui/sheet.dart';
+import '../../core/ui/states.dart';
 import '../../data/news.dart';
 import '../../state/blocklist.dart';
 import '../../state/news.dart';
 import '../../state/providers.dart';
 import 'news_screen.dart';
 
-/// A single post with its conversation. Replies follow Threads' anatomy:
-/// avatar column with a thin connector line stitching the thread together,
-/// name + relative time on the top row, body underneath. Replies can be
-/// answered (one nesting level), and authors can edit/delete their own.
+/// A single post with its conversation.
+///
+/// Replies use a threaded anatomy: an avatar column with a thin connector line
+/// stitching the thread together, name + relative time on the top row, body
+/// underneath. Replies can be answered (one nesting level), and authors can
+/// edit or delete their own.
 class NewsPostScreen extends ConsumerStatefulWidget {
   const NewsPostScreen({super.key, required this.post});
 
@@ -32,7 +42,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
   final _replyController = TextEditingController();
   bool _sending = false;
 
-  /// Reply being answered (Threads-style "Replying to …" chip).
+  /// Reply being answered ("Replying to …" chip above the composer).
   NewsReply? _replyTo;
 
   /// Image attached to the pending reply.
@@ -46,9 +56,9 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
     super.dispose();
   }
 
-  /// The name shown on this user's replies: local display name first, then
-  /// the Supabase account's username (GitHub user_name / Google name),
-  /// then the email prefix.
+  /// The name shown on this user's replies: local display name first, then the
+  /// Supabase account's username (GitHub user_name / Google name), then the
+  /// email prefix.
   String _authorName() {
     final displayName = ref.read(displayNameProvider).valueOrNull;
     if (displayName != null && displayName.isNotEmpty) return displayName;
@@ -58,8 +68,15 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
         'omnia user';
   }
 
+  void _clearImage() {
+    setState(() {
+      _imageBytes = null;
+      _imageName = null;
+      _imageMime = null;
+    });
+  }
+
   Future<void> _pickImage() async {
-    Haptics.light();
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
@@ -68,6 +85,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
       );
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
+      if (!mounted) return;
       setState(() {
         _imageBytes = bytes;
         _imageName = picked.name;
@@ -76,9 +94,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
       Haptics.selection();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(e).message)),
-        );
+        showOmniaToast(context, message: friendlyError(e).message, error: true);
       }
     }
   }
@@ -86,6 +102,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
   Future<void> _sendReply() async {
     final body = _replyController.text.trim();
     if (body.isEmpty && _imageBytes == null) return;
+
     Haptics.medium();
     setState(() => _sending = true);
     try {
@@ -114,22 +131,23 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
         imageUrl: imageUrl,
         accessToken: token,
       );
+
       _replyController.clear();
-      setState(() {
-        _replyTo = null;
-        _imageBytes = null;
-        _imageName = null;
-        _imageMime = null;
-      });
+      if (mounted) {
+        setState(() {
+          _replyTo = null;
+          _imageBytes = null;
+          _imageName = null;
+          _imageMime = null;
+        });
+      }
       ref.invalidate(newsRepliesProvider(widget.post.id));
       ref.invalidate(newsPostsProvider);
       if (mounted) Haptics.success();
     } catch (e) {
       if (mounted) {
         Haptics.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(e).message)),
-        );
+        showOmniaToast(context, message: friendlyError(e).message, error: true);
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -137,30 +155,16 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
   }
 
   Future<void> _editReply(NewsReply reply) async {
-    final controller = TextEditingController(text: reply.body);
-    final newBody = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Edit reply'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          maxLines: 4,
-          maxLength: 2000,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+    final newBody = await showOmniaInput(
+      context,
+      title: 'Edit reply',
+      initialValue: reply.body,
+      maxLines: 5,
+      textCapitalization: TextCapitalization.sentences,
+      validator: (v) => v.isEmpty ? 'A reply can\'t be empty' : null,
     );
-    if (newBody == null || newBody.isEmpty || newBody == reply.body) return;
+    if (newBody == null || newBody == reply.body) return;
+
     try {
       final token = await ref.read(supabaseGatewayProvider).accessToken();
       await ref.read(newsRepositoryProvider).updateReply(
@@ -173,34 +177,22 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
     } catch (e) {
       if (mounted) {
         Haptics.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(e).message)),
-        );
+        showOmniaToast(context, message: friendlyError(e).message, error: true);
       }
     }
   }
 
   Future<void> _deleteReply(NewsReply reply) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Delete reply?'),
-        content: const Text('This removes your reply for everyone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await showOmniaConfirm(
+      context,
+      icon: Iconsax.trash,
+      title: 'Delete reply?',
+      message: 'This removes your reply for everyone.',
+      confirmLabel: 'Delete',
+      destructive: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
+
     try {
       final token = await ref.read(supabaseGatewayProvider).accessToken();
       await ref.read(newsRepositoryProvider).deleteReply(
@@ -213,9 +205,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
     } catch (e) {
       if (mounted) {
         Haptics.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(e).message)),
-        );
+        showOmniaToast(context, message: friendlyError(e).message, error: true);
       }
     }
   }
@@ -223,17 +213,48 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
   Future<void> _reportReply(NewsReply reply) async {
     final gateway = ref.read(supabaseGatewayProvider);
     if (!gateway.isSignedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sign in to report content.')),
+      showOmniaToast(
+        context,
+        message: 'Sign in to report content',
+        error: true,
       );
       return;
     }
-    final reason = await showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (_) => const _ReportSheet(),
+
+    final reason = await showOmniaMenu<String>(
+      context,
+      title: 'Report content',
+      actions: const [
+        SheetAction(
+          label: 'Spam or scam',
+          value: 'Spam or scam',
+          icon: Iconsax.danger_copy,
+        ),
+        SheetAction(
+          label: 'Harassment or bullying',
+          value: 'Harassment or bullying',
+          icon: Iconsax.emoji_sad_copy,
+        ),
+        SheetAction(
+          label: 'Hate speech',
+          value: 'Hate speech',
+          icon: Iconsax.volume_slash_copy,
+        ),
+        SheetAction(
+          label: 'Sexual or explicit content',
+          value: 'Sexual or explicit content',
+          icon: Iconsax.eye_slash_copy,
+        ),
+        SheetAction(
+          label: 'Violence or threats',
+          value: 'Violence or threats',
+          icon: Iconsax.warning_2_copy,
+        ),
+        SheetAction(label: 'Other', value: 'Other', icon: Iconsax.more_copy),
+      ],
     );
-    if (reason == null) return;
+    if (reason == null || !mounted) return;
+
     try {
       final token = await gateway.accessToken();
       await ref.read(newsRepositoryProvider).reportContent(
@@ -245,19 +266,15 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
           );
       if (mounted) {
         Haptics.success();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Reported. Thanks — our team reviews reports within 24 hours.'),
-          ),
+        showOmniaToast(
+          context,
+          message: 'Reported — our team reviews within 24 hours',
         );
       }
     } catch (e) {
       if (mounted) {
         Haptics.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(e).message)),
-        );
+        showOmniaToast(context, message: friendlyError(e).message, error: true);
       }
     }
   }
@@ -265,45 +282,79 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
   Future<void> _blockUser(NewsReply reply) async {
     final key = blockKeyFor(userId: reply.userId, name: reply.authorName);
     if (key == null) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text('Block ${reply.authorName}?'),
-        content: const Text(
-            "You won't see their posts or replies. You can unblock them "
-            'later in Settings.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Block'),
-          ),
-        ],
-      ),
+
+    final confirmed = await showOmniaConfirm(
+      context,
+      icon: Iconsax.slash,
+      title: 'Block ${reply.authorName}?',
+      message: "You won't see their posts or replies. You can unblock them "
+          'later under Safety.',
+      confirmLabel: 'Block',
+      destructive: true,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
+
     await ref.read(blocklistProvider.notifier).block(key);
     if (mounted) {
       Haptics.success();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Blocked ${reply.authorName}.')),
-      );
+      showOmniaToast(context, message: 'Blocked ${reply.authorName}');
+    }
+  }
+
+  Future<void> _replyMenu(NewsReply reply, {required bool isMine}) async {
+    final action = await showOmniaMenu<String>(
+      context,
+      actions: isMine
+          ? const [
+              SheetAction(
+                label: 'Edit reply',
+                value: 'edit',
+                icon: Iconsax.edit_2_copy,
+              ),
+              SheetAction(
+                label: 'Delete reply',
+                value: 'delete',
+                icon: Iconsax.trash,
+                destructive: true,
+              ),
+            ]
+          : [
+              const SheetAction(
+                label: 'Report',
+                value: 'report',
+                icon: Iconsax.flag_copy,
+              ),
+              SheetAction(
+                label: 'Block ${reply.authorName}',
+                value: 'block',
+                icon: Iconsax.slash,
+                destructive: true,
+              ),
+            ],
+    );
+    if (action == null) return;
+
+    switch (action) {
+      case 'edit':
+        await _editReply(reply);
+      case 'delete':
+        await _deleteReply(reply);
+      case 'report':
+        await _reportReply(reply);
+      case 'block':
+        await _blockUser(reply);
     }
   }
 
   void _startReplyTo(NewsReply reply) {
     Haptics.selection();
-    setState(() {
-      // One nesting level: answering a child threads under its parent.
-      _replyTo = reply;
-    });
+    // One nesting level: answering a child threads under its parent.
+    setState(() => _replyTo = reply);
   }
 
   @override
   Widget build(BuildContext context) {
+    final o = context.omnia;
     final repliesAsync = ref.watch(newsRepliesProvider(widget.post.id));
     final mode =
         ref.watch(authModeProvider).valueOrNull ?? AuthMode.selfCustody;
@@ -311,122 +362,78 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
     final canReply = mode == AuthMode.supabase && gateway.isSignedIn;
     final myUserId = gateway.isAvailable ? gateway.userId : null;
     final blocked = ref.watch(blocklistProvider);
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Post')),
+      backgroundColor: o.bg,
+      appBar: const OmniaHeader(title: 'Post'),
       body: Column(
         children: [
           Expanded(
-            child: RefreshIndicator(
+            child: OmniaRefresh(
               onRefresh: () async {
                 ref.invalidate(newsRepliesProvider(widget.post.id));
                 await ref.read(newsRepliesProvider(widget.post.id).future);
               },
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.only(bottom: Space.xl),
                 children: [
                   NewsPostCard(post: widget.post, full: true),
-                  const SizedBox(height: 18),
-                  Text(
-                    'Replies',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 8),
+                  const Hairline(),
+                  const OmniaSectionLabel('Replies'),
                   repliesAsync.when(
                     loading: () => const Padding(
-                      padding: EdgeInsets.all(24),
+                      padding: EdgeInsets.all(Space.xxl),
                       child: Center(child: CircularProgressIndicator()),
                     ),
-                    error: (e, _) => Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(friendlyError(e).message),
+                    error: (e, _) => OmniaErrorState(
+                      message: friendlyError(e).message,
+                      compact: true,
+                      onRetry: () => ref
+                          .invalidate(newsRepliesProvider(widget.post.id)),
                     ),
-                    data: (replies) {
-                      if (replies.isEmpty) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          child: Center(
-                            child: Text(
-                              'No replies yet — start the conversation.',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: scheme.onSurfaceVariant),
-                            ),
-                          ),
-                        );
-                      }
-                      return _ThreadedReplies(
-                        replies: replies,
-                        myUserId: myUserId,
-                        blocked: blocked,
-                        canInteract: canReply,
-                        onReply: _startReplyTo,
-                        onEdit: _editReply,
-                        onDelete: _deleteReply,
-                        onReport: _reportReply,
-                        onBlock: _blockUser,
-                      );
-                    },
+                    data: (replies) => _ThreadedReplies(
+                      replies: replies,
+                      myUserId: myUserId,
+                      blocked: blocked,
+                      canInteract: canReply,
+                      onReply: _startReplyTo,
+                      onMenu: _replyMenu,
+                    ),
                   ),
                 ],
               ),
             ),
           ),
-          // Composer — or a sign-in hint for self-custody users.
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-              child: canReply
-                  ? _Composer(
-                      controller: _replyController,
-                      sending: _sending,
-                      replyTo: _replyTo,
-                      imageBytes: _imageBytes,
-                      onPickImage: _pickImage,
-                      onClearImage: () => setState(() {
-                        _imageBytes = null;
-                        _imageName = null;
-                        _imageMime = null;
-                      }),
-                      onCancelReplyTo: () => setState(() => _replyTo = null),
-                      onSend: _sendReply,
-                    )
-                  : Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: scheme.surfaceContainerHighest
-                            .withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.lock_outline,
-                              size: 18, color: scheme.onSurfaceVariant),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              'Sign in with your Omnia account to join the '
-                              'conversation.',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: scheme.onSurfaceVariant),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-            ),
-          ),
+          if (canReply)
+            _Composer(
+              controller: _replyController,
+              sending: _sending,
+              replyTo: _replyTo,
+              imageBytes: _imageBytes,
+              onPickImage: _pickImage,
+              onClearImage: _clearImage,
+              onCancelReplyTo: () => setState(() => _replyTo = null),
+              onSend: _sendReply,
+            )
+          else
+            const _SignInHint(),
         ],
       ),
     );
   }
 }
 
-/// The reply composer: optional "Replying to" chip, optional image preview,
-/// text field with attach + send.
+// ---------------------------------------------------------------------------
+// Composer
+// ---------------------------------------------------------------------------
+
+/// The reply composer: an optional "Replying to" chip, an optional image
+/// preview, and a pill-shaped field with attach + send.
+///
+/// Docked to the bottom with a hairline above it, and lifts with the keyboard
+/// rather than being covered by it.
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
@@ -450,110 +457,237 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (replyTo != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Row(
-              children: [
-                Icon(Icons.subdirectory_arrow_right,
-                    size: 16, color: scheme.onSurfaceVariant),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Replying to ${replyTo!.authorName}',
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelMedium
-                        ?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ),
-                InkWell(
-                  onTap: onCancelReplyTo,
-                  child: Icon(Icons.close,
-                      size: 16, color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-        if (imageBytes != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.memory(
-                    imageBytes!,
-                    height: 84,
-                    width: 84,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Positioned(
-                  top: 2,
-                  left: 62,
-                  child: InkWell(
-                    onTap: onClearImage,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: scheme.surface.withValues(alpha: 0.9),
-                        shape: BoxShape.circle,
+    final o = context.omnia;
+    final target = replyTo;
+    final bytes = imageBytes;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: o.bg,
+        border: Border(top: BorderSide(color: o.borderLow)),
+      ),
+      padding: EdgeInsets.only(
+        left: Space.md,
+        right: Space.md,
+        top: Space.sm,
+        bottom: Space.sm +
+            MediaQuery.viewInsetsOf(context).bottom +
+            MediaQuery.viewPaddingOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (target != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Space.xs, 0, 0, Space.sm),
+              child: Row(
+                children: [
+                  Icon(Iconsax.arrow_bottom, size: 14, color: o.textLow),
+                  const SizedBox(width: Space.xs + 2),
+                  Expanded(
+                    child: Text(
+                      'Replying to ${target.authorName}',
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: FontSizes.sm,
+                        color: o.textLow,
                       ),
-                      padding: const EdgeInsets.all(2),
-                      child: const Icon(Icons.close, size: 14),
+                    ),
+                  ),
+                  OmniaIconButton(
+                    icon: Iconsax.close_circle,
+                    size: 16,
+                    box: 28,
+                    color: o.textLow,
+                    tooltip: 'Cancel reply',
+                    onTap: onCancelReplyTo,
+                  ),
+                ],
+              ),
+            ),
+          if (bytes != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(Space.xs, 0, 0, Space.sm),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  ClipRRect(
+                    borderRadius: Radii.rSm,
+                    child: Image.memory(
+                      bytes,
+                      height: 76,
+                      width: 76,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Positioned(
+                    top: -6,
+                    right: -6,
+                    child: Pressable(
+                      onTap: onClearImage,
+                      feel: PressFeel.subtle,
+                      semanticLabel: 'Remove image',
+                      child: Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: o.text,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: o.bg, width: 2),
+                        ),
+                        child: Icon(
+                          Iconsax.close_circle,
+                          size: 13,
+                          color: o.bg,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              OmniaIconButton(
+                icon: Iconsax.gallery_copy,
+                tooltip: 'Attach image',
+                color: o.textMedium,
+                onTap: sending ? null : onPickImage,
+              ),
+              Expanded(
+                child: Container(
+                  constraints: const BoxConstraints(maxHeight: 120),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Space.lg,
+                    vertical: Space.sm + 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: o.bg25,
+                    borderRadius: Radii.rXl,
+                    border: Border.all(color: o.borderMedium),
+                  ),
+                  child: TextField(
+                    controller: controller,
+                    enabled: !sending,
+                    maxLines: null,
+                    maxLength: 2000,
+                    textCapitalization: TextCapitalization.sentences,
+                    // The counter would push the composer taller on every
+                    // keystroke; the limit still applies.
+                    buildCounter: (_, {required currentLength,
+                            required isFocused, maxLength}) =>
+                        null,
+                    style: TextStyle(
+                      fontFamily: 'Inter',
+                      fontSize: FontSizes.md,
+                      color: o.text,
+                    ),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      filled: false,
+                      contentPadding: EdgeInsets.zero,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      hintText: 'Add a reply…',
                     ),
                   ),
                 ),
-              ],
-            ),
-          ),
-        Row(
-          children: [
-            IconButton(
-              tooltip: 'Attach image',
-              onPressed: sending ? null : onPickImage,
-              icon: const Icon(Icons.image_outlined),
-            ),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                enabled: !sending,
-                textCapitalization: TextCapitalization.sentences,
-                maxLength: 2000,
-                buildCounter: (_,
-                        {required currentLength,
-                        required isFocused,
-                        maxLength}) =>
-                    null,
-                decoration: const InputDecoration(
-                  hintText: 'Reply to omnia…',
-                  isDense: true,
-                ),
-                onSubmitted: (_) => onSend(),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton.filled(
-              onPressed: sending ? null : onSend,
-              icon: sending
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.arrow_upward),
-            ),
-          ],
-        ),
-      ],
+              const SizedBox(width: Space.sm),
+              _SendButton(sending: sending, onSend: onSend),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
+
+class _SendButton extends StatelessWidget {
+  const _SendButton({required this.sending, required this.onSend});
+
+  final bool sending;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.omnia;
+    return Pressable(
+      onTap: sending ? null : onSend,
+      feel: PressFeel.firm,
+      semanticLabel: 'Send reply',
+      child: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: sending ? o.accentDisabled : o.accent,
+          shape: BoxShape.circle,
+        ),
+        child: sending
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: OmniaPalette.white,
+                ),
+              )
+            : const Icon(
+                Iconsax.arrow_up_3_copy,
+                size: 18,
+                color: OmniaPalette.white,
+              ),
+      ),
+    );
+  }
+}
+
+class _SignInHint extends StatelessWidget {
+  const _SignInHint();
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.omnia;
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: o.bg25,
+        border: Border(top: BorderSide(color: o.borderLow)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        Space.lg,
+        Space.md,
+        Space.lg,
+        Space.md + MediaQuery.viewPaddingOf(context).bottom,
+      ),
+      child: Row(
+        children: [
+          Icon(Iconsax.lock_copy, size: 17, color: o.textLow),
+          const SizedBox(width: Space.md - 2),
+          Expanded(
+            child: Text(
+              'Sign in with your Omnia account to join the conversation.',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.sm,
+                height: LineHeights.snug,
+                color: o.textLow,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Thread
+// ---------------------------------------------------------------------------
 
 /// Renders the reply list with one level of nesting: top-level replies in
 /// order, children indented beneath their parent.
@@ -564,10 +698,7 @@ class _ThreadedReplies extends StatelessWidget {
     required this.blocked,
     required this.canInteract,
     required this.onReply,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onReport,
-    required this.onBlock,
+    required this.onMenu,
   });
 
   final List<NewsReply> replies;
@@ -575,10 +706,7 @@ class _ThreadedReplies extends StatelessWidget {
   final Set<String> blocked;
   final bool canInteract;
   final void Function(NewsReply) onReply;
-  final void Function(NewsReply) onEdit;
-  final void Function(NewsReply) onDelete;
-  final void Function(NewsReply) onReport;
-  final void Function(NewsReply) onBlock;
+  final Future<void> Function(NewsReply, {required bool isMine}) onMenu;
 
   bool _isBlocked(NewsReply r) {
     final key = blockKeyFor(userId: r.userId, name: r.authorName);
@@ -587,19 +715,16 @@ class _ThreadedReplies extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Hide replies from blocked authors (content moderation, client-side).
+    // Hide replies from blocked authors (client-side moderation).
     final visible = replies.where((r) => !_isBlocked(r)).toList();
     if (visible.isEmpty) {
-      final theme = Theme.of(context);
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Center(
-          child: Text(
-            'No replies to show.',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-        ),
+      return OmniaEmptyState(
+        icon: Iconsax.message_copy,
+        title: replies.isEmpty ? 'No replies yet' : 'No replies to show',
+        message: replies.isEmpty
+            ? 'Start the conversation.'
+            : 'The replies here are from people you blocked.',
+        compact: true,
       );
     }
 
@@ -619,42 +744,38 @@ class _ThreadedReplies extends StatelessWidget {
     for (var i = 0; i < topLevel.length; i++) {
       final parent = topLevel[i];
       final children = byParent[parent.id] ?? const <NewsReply>[];
-      final parentIsLast = i == topLevel.length - 1 && children.isEmpty;
       rows.add(_ReplyRow(
         reply: parent,
-        isLast: parentIsLast,
+        isLast: i == topLevel.length - 1 && children.isEmpty,
         isMine: myUserId != null && parent.userId == myUserId,
         canInteract: canInteract,
         onReply: onReply,
-        onEdit: onEdit,
-        onDelete: onDelete,
-        onReport: onReport,
-        onBlock: onBlock,
+        onMenu: onMenu,
       ));
       for (var j = 0; j < children.length; j++) {
         rows.add(Padding(
-          padding: const EdgeInsets.only(left: 40),
+          padding: const EdgeInsets.only(left: Space.x4l + Space.sm),
           child: _ReplyRow(
             reply: children[j],
             isLast: i == topLevel.length - 1 && j == children.length - 1,
             isMine: myUserId != null && children[j].userId == myUserId,
             canInteract: canInteract,
             onReply: onReply,
-            onEdit: onEdit,
-            onDelete: onDelete,
-            onReport: onReport,
-            onBlock: onBlock,
+            onMenu: onMenu,
             nested: true,
           ),
         ));
       }
     }
-    return Column(children: rows);
+    return Padding(
+      padding: const EdgeInsets.only(left: Space.lg, right: Space.lg),
+      child: Column(children: rows),
+    );
   }
 }
 
-/// One Threads-style reply row: avatar + connector line on the left,
-/// name/time/body on the right, small action row underneath.
+/// One reply: avatar + connector line on the left, name/time/body on the
+/// right, a small action row underneath.
 class _ReplyRow extends StatelessWidget {
   const _ReplyRow({
     required this.reply,
@@ -662,10 +783,7 @@ class _ReplyRow extends StatelessWidget {
     required this.isMine,
     required this.canInteract,
     required this.onReply,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onReport,
-    required this.onBlock,
+    required this.onMenu,
     this.nested = false,
   });
 
@@ -675,191 +793,103 @@ class _ReplyRow extends StatelessWidget {
   final bool canInteract;
   final bool nested;
   final void Function(NewsReply) onReply;
-  final void Function(NewsReply) onEdit;
-  final void Function(NewsReply) onDelete;
-  final void Function(NewsReply) onReport;
-  final void Function(NewsReply) onBlock;
+  final Future<void> Function(NewsReply, {required bool isMine}) onMenu;
 
   @override
   Widget build(BuildContext context) {
+    final o = context.omnia;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final avatarSize = nested ? 28.0 : 34.0;
 
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Avatar column with the thread connector.
+          // Avatar column with the thread connector running down from it.
           Column(
             children: [
-              ClipOval(
+              Container(
+                width: avatarSize,
+                height: avatarSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: o.borderLow),
+                ),
+                clipBehavior: Clip.antiAlias,
                 child: Identicon(
                   seed: reply.authorDid ?? reply.authorName,
-                  size: nested ? 28 : 34,
+                  size: avatarSize,
                 ),
               ),
               if (!isLast)
                 Expanded(
                   child: Container(
                     width: 2,
-                    margin: const EdgeInsets.only(top: 4),
-                    color: scheme.outlineVariant.withValues(alpha: 0.7),
+                    margin: const EdgeInsets.only(top: Space.xs),
+                    color: o.borderLow,
                   ),
                 ),
             ],
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: Space.md),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 4 : 16),
+              padding: EdgeInsets.only(bottom: isLast ? Space.md : Space.lg),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Expanded(
+                      Flexible(
                         child: Text(
                           reply.authorName,
                           overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                          style: theme.textTheme.titleSmall,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: Space.sm),
                       Text(
                         Fmt.relative(reply.createdAt),
                         style: theme.textTheme.labelSmall
-                            ?.copyWith(color: scheme.onSurfaceVariant),
+                            ?.copyWith(color: o.textLow),
                       ),
-                      PopupMenuButton<String>(
+                      const Spacer(),
+                      OmniaIconButton(
+                        icon: Iconsax.more_copy,
+                        size: 16,
+                        box: 30,
+                        color: o.textLow,
                         tooltip: 'More',
-                        padding: EdgeInsets.zero,
-                        iconSize: 18,
-                        icon: Icon(Icons.more_horiz,
-                            color: scheme.onSurfaceVariant),
-                        onSelected: (action) {
-                          switch (action) {
-                            case 'edit':
-                              onEdit(reply);
-                            case 'delete':
-                              onDelete(reply);
-                            case 'report':
-                              onReport(reply);
-                            case 'block':
-                              onBlock(reply);
-                          }
-                        },
-                        itemBuilder: (_) => isMine
-                            ? const [
-                                PopupMenuItem(
-                                    value: 'edit', child: Text('Edit')),
-                                PopupMenuItem(
-                                    value: 'delete', child: Text('Delete')),
-                              ]
-                            : [
-                                const PopupMenuItem(
-                                  value: 'report',
-                                  child: ListTile(
-                                    dense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: Icon(Icons.flag_outlined),
-                                    title: Text('Report'),
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'block',
-                                  child: ListTile(
-                                    dense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: const Icon(Icons.block),
-                                    title: Text('Block ${reply.authorName}'),
-                                  ),
-                                ),
-                              ],
+                        onTap: () => onMenu(reply, isMine: isMine),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 3),
                   Text(
                     reply.body,
-                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: o.textHigh, height: 1.4),
                   ),
                   if (reply.imageUrl != null) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: Space.sm),
                     NewsImage(url: reply.imageUrl!, maxHeight: 220),
                   ],
-                  if (canInteract && !nested) ...[
-                    const SizedBox(height: 2),
+                  // Only top-level replies can be answered — one nesting
+                  // level, so a child has nowhere deeper to go.
+                  if (canInteract && !nested)
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          minimumSize: const Size(0, 30),
-                          foregroundColor: scheme.onSurfaceVariant,
-                        ),
-                        onPressed: () => onReply(reply),
-                        icon: const Icon(Icons.chat_bubble_outline, size: 15),
-                        label: const Text('Reply'),
+                      child: OmniaTextButton(
+                        label: 'Reply',
+                        icon: Iconsax.message_copy,
+                        size: FontSizes.sm,
+                        color: o.textLow,
+                        onTap: () => onReply(reply),
                       ),
                     ),
-                  ],
                 ],
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Bottom sheet that asks why a piece of content is being reported and pops
-/// the chosen reason (content moderation). Returns null if dismissed.
-class _ReportSheet extends StatelessWidget {
-  const _ReportSheet();
-
-  static const _reasons = <(String, IconData)>[
-    ('Spam or scam', Icons.report_gmailerrorred_outlined),
-    ('Harassment or bullying', Icons.mood_bad_outlined),
-    ('Hate speech', Icons.volume_off_outlined),
-    ('Sexual or explicit content', Icons.no_adult_content_outlined),
-    ('Violence or threats', Icons.dangerous_outlined),
-    ('Other', Icons.more_horiz),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-            child: Text(
-              'Report content',
-              style: theme.textTheme.titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-            child: Text(
-              'Tell us what’s wrong. Our team reviews every report within '
-              '24 hours and removes anything that breaks our guidelines.',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-          ),
-          for (final (label, icon) in _reasons)
-            ListTile(
-              leading: Icon(icon),
-              title: Text(label),
-              onTap: () => Navigator.of(context).pop(label),
-            ),
-          const SizedBox(height: 8),
         ],
       ),
     );

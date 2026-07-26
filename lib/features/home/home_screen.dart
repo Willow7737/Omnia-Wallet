@@ -1,98 +1,90 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 import '../../core/brand/brand.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
-import '../../core/motion.dart';
 import '../../core/theme.dart';
-import '../../core/widgets/animated_count.dart';
-import '../../core/widgets/fade_slide_in.dart';
-import '../../core/widgets/shimmer.dart';
-import '../../core/widgets/user_avatar.dart';
+import '../../core/ui/amount.dart';
+import '../../core/ui/avatar.dart';
+import '../../core/ui/button.dart';
+import '../../core/ui/header.dart';
+import '../../core/ui/list_row.dart';
+import '../../core/ui/press.dart';
+import '../../core/ui/states.dart';
 import '../../data/models.dart';
-import '../../state/news.dart';
-import '../../state/notices.dart';
 import '../../state/providers.dart';
+import '../shell/app_shell.dart';
 
+/// The wallet's front page: balance, the two things you actually do with a
+/// wallet, and the most recent activity.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final o = context.omnia;
     final balanceAsync = ref.watch(balanceProvider);
-    final theme = Theme.of(context);
-
-    // Fetch news in the background so a fresh post files a notification
-    // even before the user opens the News tab.
-    ref.watch(newsPostsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: 20,
-        title: const BrandWordmark(markSize: 28, fontSize: 28),
-        toolbarHeight: 68,
-        // One uncluttered entry point: everything lives in the avatar menu.
-        actions: const [_AvatarMenu()],
+      backgroundColor: o.bg,
+      appBar: OmniaHeader(
+        showBack: false,
+        titleWidget: const BrandWordmark(),
+        actions: [
+          OmniaIconButton(
+            icon: Iconsax.scan_barcode_copy,
+            tooltip: 'Scan a code',
+            onTap: () {
+              Haptics.medium();
+              context.push('/scan');
+            },
+          ),
+          OmniaIconButton(
+            icon: Iconsax.setting_2_copy,
+            tooltip: 'Settings',
+            onTap: () => context.push('/settings'),
+          ),
+        ],
       ),
-      body: RefreshIndicator(
+      body: OmniaRefresh(
         onRefresh: () async {
-          Haptics.light();
           ref.invalidate(balanceProvider);
           ref.invalidate(historyProvider);
           await ref.read(balanceProvider.future);
         },
         child: ListView(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.only(bottom: tabBarInset(context) + Space.xxl),
           children: [
-            if (balanceAsync.hasError) ...[
-              _OfflineBanner(error: friendlyError(balanceAsync.error!)),
-              const SizedBox(height: 16),
-            ],
-            FadeSlideIn(child: _BalanceCard(balanceAsync: balanceAsync)),
-            const SizedBox(height: 20),
-            FadeSlideIn(
-              delay: Motion.micro,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.arrow_upward,
-                      label: 'Send',
-                      color: context.omnia.negative,
-                      onTap: () => context.push('/send'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _ActionButton(
-                      icon: Icons.arrow_downward,
-                      label: 'Receive',
-                      color: context.omnia.positive,
-                      onTap: () => context.push('/receive'),
-                    ),
-                  ),
-                ],
+            if (balanceAsync.hasError)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  Space.lg,
+                  Space.md,
+                  Space.lg,
+                  0,
+                ),
+                child: _OfflineBanner(error: friendlyError(balanceAsync.error!)),
+              ),
+            FadeIn(child: _Balance(balanceAsync: balanceAsync)),
+            const FadeIn(
+              delay: Duration(milliseconds: 60),
+              child: _Actions(),
+            ),
+            const SizedBox(height: Space.sm),
+            Hairline(),
+            OmniaSectionHeader(
+              title: 'Recent activity',
+              action: OmniaTextButton(
+                label: 'See all',
+                size: FontSizes.sm,
+                onTap: () => context.go('/activity'),
               ),
             ),
-            const SizedBox(height: 28),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Recent activity', style: theme.textTheme.titleMedium),
-                TextButton(
-                  onPressed: () {
-                    Haptics.light();
-                    context.push('/history');
-                  },
-                  child: const Text('See all'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            _RecentActivity(),
+            const _RecentActivity(),
           ],
         ),
       ),
@@ -100,112 +92,185 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// The avatar in the top bar: shows an unread dot and opens a dropdown with
-/// Profile, Notifications, News, Governance, and Settings.
-class _AvatarMenu extends ConsumerWidget {
-  const _AvatarMenu();
+// ---------------------------------------------------------------------------
+// Balance
+// ---------------------------------------------------------------------------
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final unread = ref.watch(unreadNoticesProvider);
-    final scheme = Theme.of(context).colorScheme;
+/// The balance block.
+///
+/// Deliberately *not* a card. Bluesky has no elevated card surfaces; the
+/// figure earns its prominence from type size and whitespace, and the hairline
+/// below it is the only separation it needs.
+class _Balance extends StatelessWidget {
+  const _Balance({required this.balanceAsync});
 
-    return PopupMenuButton<String>(
-      tooltip: 'Menu',
-      offset: const Offset(0, 52),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      onOpened: Haptics.light,
-      onSelected: (route) {
-        Haptics.selection();
-        context.push(route);
-      },
-      itemBuilder: (_) => [
-        const PopupMenuItem(
-          value: '/profile',
-          child: _MenuRow(icon: Icons.person_outline, label: 'Profile'),
-        ),
-        PopupMenuItem(
-          value: '/notifications',
-          child: _MenuRow(
-            icon: Icons.notifications_none,
-            label: 'Notifications',
-            badgeCount: unread,
-          ),
-        ),
-        const PopupMenuItem(
-          value: '/news',
-          child: _MenuRow(icon: Icons.newspaper_outlined, label: 'News'),
-        ),
-        const PopupMenuItem(
-          value: '/governance',
-          child:
-              _MenuRow(icon: Icons.how_to_vote_outlined, label: 'Governance'),
-        ),
-        const PopupMenuDivider(),
-        const PopupMenuItem(
-          value: '/settings',
-          child: _MenuRow(icon: Icons.settings_outlined, label: 'Settings'),
-        ),
-      ],
-      child: Padding(
-        padding: const EdgeInsets.only(right: 16, left: 8),
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            const UserAvatar(size: 36),
-            if (unread > 0)
-              Positioned(
-                right: -2,
-                top: -2,
-                child: Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: scheme.error,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: scheme.surface, width: 2),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MenuRow extends StatelessWidget {
-  const _MenuRow({required this.icon, required this.label, this.badgeCount});
-
-  final IconData icon;
-  final String label;
-  final int? badgeCount;
+  final AsyncValue<Balance> balanceAsync;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: scheme.onSurfaceVariant),
-        const SizedBox(width: 12),
-        Text(label),
-        const Spacer(),
-        if ((badgeCount ?? 0) > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: scheme.error,
-              borderRadius: BorderRadius.circular(10),
+    final o = context.omnia;
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Space.lg, Space.xxl, Space.lg, Space.xl),
+      child: balanceAsync.when(
+        loading: () => const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Skeleton.line(width: 64, height: 11),
+            SizedBox(height: Space.md),
+            Skeleton.line(width: 200, height: 34),
+            SizedBox(height: Space.lg),
+            Skeleton.line(width: 140, height: 11),
+          ],
+        ),
+        error: (e, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Balance unavailable',
+              style: theme.textTheme.labelMedium?.copyWith(color: o.textLow),
             ),
-            child: Text(
-              badgeCount! > 9 ? '9+' : '$badgeCount',
+            const SizedBox(height: Space.xs),
+            Text('—', style: theme.textTheme.displaySmall),
+          ],
+        ),
+        data: (b) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Balance',
               style: TextStyle(
-                color: scheme.onError,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+                fontFamily: 'Inter',
+                fontSize: FontSizes.sm,
+                fontWeight: Weights.semiBold,
+                color: o.textLow,
               ),
             ),
+            const SizedBox(height: Space.xs + 2),
+            // The one place in the app that uses the largest type step.
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Flexible(
+                  child: AnimatedCount(
+                    value: b.balance,
+                    format: Fmt.number,
+                    style: theme.textTheme.displayMedium,
+                  ),
+                ),
+                const SizedBox(width: Space.sm),
+                Text(
+                  'UBC',
+                  style: theme.textTheme.headlineMedium
+                      ?.copyWith(color: o.textLow),
+                ),
+              ],
+            ),
+            const SizedBox(height: Space.lg),
+            if (b.isRegistered)
+              // Flexible on both sides: at large text sizes "Monthly quota"
+              // alone can outgrow half the width, and a fixed Row would clip
+              // the epoch rather than let the label ellipsise.
+              Row(
+                children: [
+                  Flexible(
+                    child: _Stat(
+                      label: 'Monthly quota',
+                      value: Fmt.number(b.monthlyQuota),
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 28,
+                    margin: const EdgeInsets.symmetric(horizontal: Space.lg),
+                    color: o.borderLow,
+                  ),
+                  Flexible(
+                    child: _Stat(label: 'Epoch', value: '#${b.currentEpoch}'),
+                  ),
+                ],
+              )
+            else
+              _Notice(
+                icon: Iconsax.info_circle_copy,
+                text: 'Not registered yet — activity or rewards will '
+                    'activate your UBC.',
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.omnia;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: FontSizes.xs,
+            fontWeight: Weights.medium,
+            color: o.textLow,
           ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontSize: FontSizes.md,
+            fontWeight: Weights.semiBold,
+            color: o.text,
+            fontFeatures: kTabularFigures,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Notice extends StatelessWidget {
+  const _Notice({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.omnia;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 15, color: o.textLow),
+        const SizedBox(width: Space.sm),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: FontSizes.sm,
+              height: LineHeights.relaxed,
+              color: o.textLow,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -213,32 +278,38 @@ class _MenuRow extends StatelessWidget {
 
 class _OfflineBanner extends StatelessWidget {
   const _OfflineBanner({required this.error});
+
   final FriendlyError error;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final o = context.omnia;
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.md + 2,
+        vertical: Space.md,
+      ),
       decoration: BoxDecoration(
-        color: scheme.errorContainer.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.error.withValues(alpha: 0.3)),
+        color: o.negative.withValues(alpha: 0.10),
+        borderRadius: Radii.rMd,
       ),
       child: Row(
         children: [
           Icon(
-            error.isOffline ? Icons.wifi_off_rounded : Icons.error_outline,
-            color: scheme.onErrorContainer,
-            size: 20,
+            error.isOffline ? Iconsax.wifi_square_copy : Iconsax.danger_copy,
+            size: 17,
+            color: o.negative,
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: Space.md - 2),
           Expanded(
             child: Text(
               error.message,
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: scheme.onErrorContainer),
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.sm,
+                height: LineHeights.snug,
+                color: o.negative,
+              ),
             ),
           ),
         ],
@@ -247,176 +318,82 @@ class _OfflineBanner extends StatelessWidget {
   }
 }
 
-class _BalanceCard extends StatelessWidget {
-  const _BalanceCard({required this.balanceAsync});
-  final AsyncValue<Balance> balanceAsync;
+// ---------------------------------------------------------------------------
+// Actions
+// ---------------------------------------------------------------------------
+
+class _Actions extends StatelessWidget {
+  const _Actions();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: balanceAsync.when(
-          loading: () => const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ShimmerBox(width: 80, height: 14),
-              SizedBox(height: 14),
-              ShimmerBox(width: 200, height: 40, radius: 10),
-              SizedBox(height: 18),
-              ShimmerBox(width: 150, height: 14),
-            ],
-          ),
-          error: (e, _) => SizedBox(
-            height: 96,
-            child: Center(
-              child: Text(
-                friendlyError(e).message,
-                textAlign: TextAlign.center,
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+      child: Row(
+        children: [
+          Expanded(
+            child: OmniaButton(
+              label: 'Send',
+              icon: Iconsax.arrow_up_3_copy,
+              expand: true,
+              onPressed: () => context.push('/send'),
             ),
           ),
-          data: (b) => Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Balance',
-                style: theme.textTheme.labelLarge
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 6),
-              AnimatedCount(
-                value: b.balance,
-                format: Fmt.ubc,
-                style: theme.textTheme.displaySmall,
-              ),
-              const SizedBox(height: 12),
-              if (b.isRegistered)
-                Wrap(
-                  spacing: 16,
-                  children: [
-                    _Meta(
-                      label: 'Monthly quota',
-                      value: Fmt.number(b.monthlyQuota),
-                    ),
-                    _Meta(label: 'Epoch', value: '#${b.currentEpoch}'),
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    Icon(Icons.info_outline,
-                        size: 16, color: theme.colorScheme.onSurfaceVariant),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        'Not registered yet — activity or rewards will activate your UBC.',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: OmniaButton(
+              label: 'Receive',
+              icon: Iconsax.arrow_down_copy,
+              expand: true,
+              color: ButtonColor.secondary,
+              onPressed: () => context.push('/receive'),
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
 
-class _Meta extends StatelessWidget {
-  const _Meta({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-        ),
-        Text(value, style: theme.textTheme.titleSmall),
-      ],
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-
-  /// Semantic tint: send reads warm/red, receive reads green.
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton.tonalIcon(
-      onPressed: () {
-        Haptics.light();
-        onTap();
-      },
-      icon: Icon(icon),
-      label: Text(label),
-      style: FilledButton.styleFrom(
-        minimumSize: const Size.fromHeight(56),
-        backgroundColor: color.withValues(alpha: 0.13),
-        foregroundColor: color,
-        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-      ),
-    );
-  }
-}
+// ---------------------------------------------------------------------------
+// Recent activity
+// ---------------------------------------------------------------------------
 
 class _RecentActivity extends ConsumerWidget {
+  const _RecentActivity();
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final historyAsync = ref.watch(historyProvider);
+
     return historyAsync.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          children: [
-            _ActivitySkeleton(),
-            SizedBox(height: 12),
-            _ActivitySkeleton(),
-            SizedBox(height: 12),
-            _ActivitySkeleton(),
-          ],
-        ),
+      loading: () => const Column(
+        children: [
+          TransferSkeleton(),
+          TransferSkeleton(),
+          TransferSkeleton(),
+        ],
       ),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.all(12),
-        child: Text(friendlyError(e).message),
+      error: (e, _) => OmniaErrorState(
+        message: friendlyError(e).message,
+        compact: true,
+        onRetry: () => ref.invalidate(historyProvider),
       ),
       data: (records) {
         if (records.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(24),
-            child: Center(child: Text('No transactions yet')),
+          return const OmniaEmptyState(
+            icon: Iconsax.receipt_2_copy,
+            title: 'No activity yet',
+            message: 'Transfers on the network will appear here.',
+            compact: true,
           );
         }
-        final recent = records.reversed.take(5).toList();
+        final recent = records.reversed.take(6).toList();
         return Column(
           children: [
             for (var i = 0; i < recent.length; i++)
-              FadeSlideIn(
-                delay: Duration(milliseconds: 40 * i),
+              FadeIn(
+                delay: FadeIn.stagger(i),
                 child: TransferTile(record: recent[i]),
               ),
           ],
@@ -426,100 +403,141 @@ class _RecentActivity extends ConsumerWidget {
   }
 }
 
-class _ActivitySkeleton extends StatelessWidget {
-  const _ActivitySkeleton();
+/// A loading placeholder shaped exactly like a [TransferTile], so the list
+/// doesn't reflow when real data lands.
+class TransferSkeleton extends StatelessWidget {
+  const TransferSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
-      children: [
-        ShimmerBox(width: 40, height: 40, radius: 20),
-        SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ShimmerBox(width: 140, height: 14),
-            SizedBox(height: 8),
-            ShimmerBox(width: 90, height: 12),
-          ],
-        ),
-      ],
+    return const Padding(
+      padding: EdgeInsets.symmetric(horizontal: Space.lg, vertical: Space.md),
+      child: Row(
+        children: [
+          Skeleton.circle(size: 40),
+          SizedBox(width: Space.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Skeleton.line(width: 170, height: 13),
+                SizedBox(height: Space.sm),
+                Skeleton.line(width: 110, height: 11),
+              ],
+            ),
+          ),
+          Skeleton.line(width: 44, height: 13),
+        ],
+      ),
     );
   }
 }
 
-/// One transfer in a list. Your own sends read loud (red, minus, "You
-/// sent"); other users' activity reads quiet and neutral. Tapping opens the
+/// One transfer in a list.
+///
+/// Your own sends read loud (a negative-tinted up arrow, a minus sign, "You
+/// sent"); everyone else's activity reads quiet and neutral. Tapping opens the
 /// full transaction page.
 class TransferTile extends ConsumerWidget {
   const TransferTile({super.key, required this.record});
+
   final TransferRecord record;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final o = context.omnia;
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final omnia = context.omnia;
     final myDid = ref.watch(identityProvider).valueOrNull?.did;
     final mine = myDid != null && record.fromDid == myDid;
+    final tint = mine ? o.negative : o.textMedium;
 
-    final tint = mine ? omnia.negative : scheme.onSurfaceVariant;
-
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      onTap: () {
-        Haptics.light();
-        context.push('/tx', extra: record);
-      },
-      leading: CircleAvatar(
-        backgroundColor: tint.withValues(alpha: 0.12),
-        child: Icon(
-          mine ? Icons.arrow_upward : Icons.swap_horiz,
-          color: tint,
-          size: 22,
+    return Pressable(
+      onTap: () => context.push('/tx', extra: record),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.lg,
+          vertical: Space.md,
         ),
-      ),
-      title: Text(
-        mine
-            ? 'You sent ${Fmt.ubc(record.amount)}'
-            : '${Fmt.shortDid(record.fromDid)} sent '
-                '${Fmt.ubc(record.amount)}',
-        style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: mine ? FontWeight.w700 : FontWeight.w500,
-        ),
-      ),
-      subtitle: Text(
-        'To ${Fmt.shortDid(record.toDid)}\n${Fmt.dateTime(record.dateTime)}',
-      ),
-      isThreeLine: true,
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            mine ? '−${record.amount}' : '${record.amount}',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontFeatures: const [FontFeature.tabularFigures()],
-              color: mine ? omnia.negative : scheme.onSurfaceVariant,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconAvatar(
+              icon: mine ? Iconsax.arrow_up_3_copy : Iconsax.arrow_swap_horizontal_copy,
+              tint: tint,
             ),
-          ),
-          // At-a-glance provenance/finality cues (details on the tx screen).
-          if (record.isWalletSigned || record.lane0Final == true) ...[
-            const SizedBox(height: 3),
-            Row(
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    mine
+                        ? 'You sent'
+                        : '${Fmt.shortDid(record.fromDid)} sent',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      fontSize: FontSizes.md,
+                      fontWeight: mine ? Weights.semiBold : Weights.medium,
+                      height: LineHeights.snug,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'To ${Fmt.shortDid(record.toDid)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.bodySmall
+                              ?.copyWith(color: o.textLow, height: 1.2),
+                        ),
+                      ),
+                      Text(
+                        ' · ${Fmt.relative(record.dateTime)}',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: o.textLow, height: 1.2),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: Space.md),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (record.lane0Final == true)
-                  Icon(Icons.bolt, size: 13, color: omnia.success),
-                if (record.isWalletSigned)
-                  Icon(Icons.verified_user_outlined,
-                      size: 12, color: scheme.primary),
+                Text(
+                  mine ? '−${Fmt.number(record.amount)}' : Fmt.number(record.amount),
+                  style: TextStyle(
+                    fontFamily: 'Inter',
+                    fontSize: FontSizes.md,
+                    fontWeight: Weights.bold,
+                    color: mine ? o.negative : o.textMedium,
+                    fontFeatures: kTabularFigures,
+                  ),
+                ),
+                // At-a-glance provenance / finality; details on the tx screen.
+                if (record.isWalletSigned || record.lane0Final == true) ...[
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (record.lane0Final == true)
+                        Icon(Iconsax.flash_1, size: 12, color: o.positive),
+                      if (record.isWalletSigned) ...[
+                        const SizedBox(width: 3),
+                        Icon(Iconsax.shield_tick, size: 12, color: o.accent),
+                      ],
+                    ],
+                  ),
+                ],
               ],
             ),
           ],
-        ],
+        ),
       ),
     );
   }
