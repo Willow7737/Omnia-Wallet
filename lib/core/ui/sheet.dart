@@ -55,17 +55,25 @@ Future<T?> showOmniaSheet<T>(
         child: builder(sheetContext),
       );
 
-      if (!scrollable) {
-        return SafeArea(top: false, child: body);
-      }
+      // No SafeArea here: `useSafeArea` already keeps the sheet clear of the
+      // status bar, and the home-indicator gap is added by
+      // [sheetBodyPadding] on the body itself. Wrapping again would pad the
+      // bottom twice.
+      if (!scrollable) return body;
 
+      const minSize = 0.25;
       return DraggableScrollableSheet(
         initialChildSize: initialSize,
-        minChildSize: 0.25,
+        minChildSize: minSize,
         maxChildSize: maxSize,
         expand: false,
         snap: true,
-        snapSizes: [initialSize],
+        // A snap point has to sit strictly inside the range; passing one equal
+        // to min or max trips an assertion, so an initial size at either
+        // extreme means no intermediate stop.
+        snapSizes: (initialSize > minSize && initialSize < maxSize)
+            ? [initialSize]
+            : const <double>[],
         builder: (_, controller) => _SheetChrome(
           title: title,
           subtitle: subtitle,

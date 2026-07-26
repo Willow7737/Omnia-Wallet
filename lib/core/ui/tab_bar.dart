@@ -59,36 +59,43 @@ class OmniaTabBar extends StatelessWidget {
     final o = context.omnia;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
 
+    final bar = Container(
+      decoration: BoxDecoration(
+        // Opaque when blur is off — the body extends behind this bar, so a
+        // translucent fill with nothing frosting it would show the content
+        // sliding underneath.
+        color: kBlurEnabled ? o.bg.withValues(alpha: 0.9) : o.bg,
+        border: Border(top: BorderSide(color: o.borderLow)),
+      ),
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: SizedBox(
+        height: barHeight,
+        child: Row(
+          children: [
+            for (var i = 0; i < tabs.length; i++)
+              Expanded(
+                child: _TabItem(
+                  tab: tabs[i],
+                  selected: i == index,
+                  onTap: () {
+                    // Re-tapping the active tab is a scroll-to-top gesture
+                    // elsewhere; either way the tick belongs on touch.
+                    Haptics.tick();
+                    onSelect(i);
+                  },
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    if (!kBlurEnabled) return bar;
+
     return ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: o.bg.withValues(alpha: 0.9),
-            border: Border(top: BorderSide(color: o.borderLow)),
-          ),
-          padding: EdgeInsets.only(bottom: bottomInset),
-          child: SizedBox(
-            height: barHeight,
-            child: Row(
-              children: [
-                for (var i = 0; i < tabs.length; i++)
-                  Expanded(
-                    child: _TabItem(
-                      tab: tabs[i],
-                      selected: i == index,
-                      onTap: () {
-                        // Re-tapping the active tab is a scroll-to-top gesture
-                        // elsewhere; either way the tick belongs on touch.
-                        Haptics.tick();
-                        onSelect(i);
-                      },
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
+        child: bar,
       ),
     );
   }

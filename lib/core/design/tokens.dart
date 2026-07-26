@@ -355,3 +355,22 @@ extension OmniaThemeNameX on OmniaThemeName {
         _ => OmniaThemeName.dim,
       };
 }
+
+/// Whether translucent surfaces actually blur what passes beneath them.
+///
+/// The header and the tab bar are frosted: a `BackdropFilter` plus a wash of
+/// the page colour. On a device that is a GPU operation and effectively free.
+///
+/// Two situations want it off:
+///
+///  * **Offscreen rendering.** `flutter test` rasterises in software, where a
+///    single full-width `BackdropFilter` turns a 30 ms `toImage()` into one
+///    that does not finish in ten minutes (measured). Anything that captures a
+///    frame — the preview harness in `test/golden_preview_test.dart`, goldens —
+///    must turn it off first.
+///  * **Reduced transparency.** Some users, and some low-end devices, are
+///    better served by a solid bar than a frosted one.
+///
+/// With blur off the surfaces stay opaque rather than transparent, so nothing
+/// becomes unreadable — only the frosting is lost.
+bool kBlurEnabled = true;

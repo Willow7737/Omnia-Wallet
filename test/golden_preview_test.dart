@@ -93,7 +93,14 @@ Future<void> _loadFonts() async {
 }
 
 void main() {
-  setUpAll(_loadFonts);
+  setUpAll(() async {
+    await _loadFonts();
+    // The test engine rasterises in software, where one full-width
+    // BackdropFilter takes a 30ms `toImage()` past ten minutes. Frosting is
+    // the one thing these previews cannot show.
+    kBlurEnabled = false;
+  });
+  tearDownAll(() => kBlurEnabled = true);
 
   const did = 'did:omnia:4bb06f8e4e3a7715d201d573d0aa4237';
   const otherDid = 'did:omnia:71a9c0e0f2b41d8a';

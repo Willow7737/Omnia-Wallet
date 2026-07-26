@@ -284,8 +284,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           child: SafeArea(
             child: ClipRRect(
               borderRadius: Radii.rFull,
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: _MaybeBlur(
+                sigma: 14,
                 child: Pressable(
                   onTap: _toMethods,
                   feel: PressFeel.subtle,
@@ -295,7 +295,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       horizontal: Space.lg,
                       vertical: Space.sm,
                     ),
-                    color: OmniaPalette.black.withValues(alpha: 0.3),
+                    color: OmniaPalette.black
+                        .withValues(alpha: kBlurEnabled ? 0.3 : 0.55),
                     child: const Text(
                       'Skip',
                       style: TextStyle(
@@ -403,6 +404,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Applies a backdrop blur, or passes the child straight through when
+/// [kBlurEnabled] is off (see its documentation).
+class _MaybeBlur extends StatelessWidget {
+  const _MaybeBlur({required this.child, required this.sigma});
+
+  final Widget child;
+  final double sigma;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!kBlurEnabled) return child;
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+      child: child,
     );
   }
 }

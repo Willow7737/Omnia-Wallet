@@ -129,6 +129,10 @@ class OmniaHeader extends StatelessWidget implements PreferredSizeWidget {
 
     if (transparent) return column;
 
+    // Opaque when blur is off, so content scrolling underneath never shows
+    // through a bar that is no longer frosting it.
+    if (!kBlurEnabled) return ColoredBox(color: o.bg, child: column);
+
     // Blur what scrolls beneath, then wash it with the page colour so text
     // stays legible over busy content.
     return ClipRect(
