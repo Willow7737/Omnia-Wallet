@@ -3,18 +3,25 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 
+import '../../core/brand/brand.dart';
 import '../../core/errors.dart';
 import '../../core/haptics.dart';
-import '../../core/widgets/fade_slide_in.dart';
-import '../../core/widgets/method_card.dart';
+import '../../core/theme.dart';
+import '../../core/ui/header.dart';
+import '../../core/ui/sheet.dart';
+import '../../core/ui/states.dart';
 import '../../data/supabase_gateway.dart';
 import '../../state/providers.dart';
+import '../onboarding/onboarding_screen.dart' show MethodCard;
 
-/// Mode B sign-in: use an existing Omnia account (created on the web app)
-/// via Google, GitHub, or email + password. After Supabase authenticates,
-/// the `mint-node-jwt` edge function links the account's DID and issues a
-/// node JWT — no key material ever touches this device in this mode.
+/// Mode B sign-in: use an existing Omnia account (created on the web app) via
+/// Google, GitHub, or email + password.
+///
+/// After Supabase authenticates, the `mint-node-jwt` edge function links the
+/// account's DID and issues a node JWT — no key material ever touches this
+/// device in this mode.
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
@@ -34,8 +41,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     if (gateway.isAvailable) {
       // OAuth returns via deep link; the session shows up on this stream.
       _authSub = gateway.signedIn.listen((_) => _complete());
-      // Already signed in to Supabase from a previous attempt? Finish the
-      // DID/JWT link straight away.
+      // Already signed in from a previous attempt? Finish the DID/JWT link
+      // straight away.
       if (gateway.isSignedIn) {
         WidgetsBinding.instance.addPostFrameCallback((_) => _complete());
       }
@@ -65,9 +72,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       _completing = false;
       if (mounted) {
         Haptics.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(e).message)),
-        );
+        showOmniaToast(context, message: friendlyError(e).message, error: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -83,9 +88,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     } catch (e) {
       if (mounted) {
         Haptics.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(e).message)),
-        );
+        showOmniaToast(context, message: friendlyError(e).message, error: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -93,24 +96,38 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   }
 
   Future<void> _email() async {
-    Haptics.light();
-    final creds = await showDialog<(String, String)>(
-      context: context,
-      builder: (_) => const _EmailDialog(),
+    final email = await showOmniaInput(
+      context,
+      title: 'Sign in with email',
+      subtitle: 'The address you used on the web app.',
+      hintText: 'you@example.com',
+      confirmLabel: 'Next',
+      keyboardType: TextInputType.emailAddress,
+      validator: (v) =>
+          v.contains('@') && v.contains('.') ? null : 'Enter a valid email',
     );
-    if (creds == null) return;
+    if (email == null || email.isEmpty || !mounted) return;
+
+    final password = await showOmniaInput(
+      context,
+      title: 'Password',
+      subtitle: email,
+      confirmLabel: 'Sign in',
+      obscure: true,
+      validator: (v) => v.isEmpty ? 'Enter your password' : null,
+    );
+    if (password == null || password.isEmpty || !mounted) return;
+
     setState(() => _busy = true);
     try {
       await ref
           .read(supabaseGatewayProvider)
-          .signInWithEmail(email: creds.$1, password: creds.$2);
+          .signInWithEmail(email: email, password: password);
       await _complete();
     } catch (e) {
       if (mounted) {
         Haptics.error();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(friendlyError(e).message)),
-        );
+        showOmniaToast(context, message: friendlyError(e).message, error: true);
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -119,66 +136,60 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final o = context.omnia;
     final theme = Theme.of(context);
     final available = ref.watch(supabaseGatewayProvider).isAvailable;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sign in')),
+      backgroundColor: o.bg,
+      appBar: const OmniaHeader(title: 'Sign in'),
       body: SafeArea(
+        top: false,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(
+            Space.xxl,
+            Space.lg,
+            Space.xxl,
+            Space.xxl,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FadeSlideIn(
+              FadeIn(
                 child: Text(
                   'Use the Omnia account you created on the web — your DID '
                   'and balance come with it.',
-                  style: theme.textTheme.bodyLarge
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  style:
+                      theme.textTheme.bodyLarge?.copyWith(color: o.textMedium),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: Space.xxl),
               if (!available)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text(
-                      'Sign-in is unavailable in this build. Create or import '
-                      'a self-custody wallet instead.',
-                    ),
-                  ),
-                )
+                _Unavailable()
               else if (_busy)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 16),
-                        Text('Linking your Omnia identity…'),
-                      ],
-                    ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: Space.x4l),
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: Space.lg),
+                      Text('Linking your Omnia identity…'),
+                    ],
                   ),
                 )
               else ...[
-                FadeSlideIn(
+                FadeIn(
                   delay: const Duration(milliseconds: 40),
                   child: MethodCard(
-                    // The official "G" on a white chip so it reads correctly
-                    // on the primary-colored card.
+                    // Google's "G" keeps its brand colours, on a white chip so
+                    // it reads correctly against the accent-filled card.
                     leading: Container(
                       padding: const EdgeInsets.all(5),
                       decoration: const BoxDecoration(
-                        color: Colors.white,
+                        color: OmniaPalette.white,
                         shape: BoxShape.circle,
                       ),
-                      child: Image.asset(
-                        'assets/brand_icons/google_g.png',
-                        width: 20,
-                        height: 20,
-                      ),
+                      child: const BrandIcon.google(size: 18),
                     ),
                     title: 'Continue with Google',
                     subtitle: 'Opens your browser to sign in',
@@ -186,47 +197,45 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     onTap: () => _social(SocialProvider.google),
                   ),
                 ),
-                const SizedBox(height: 12),
-                FadeSlideIn(
+                const SizedBox(height: Space.md),
+                FadeIn(
                   delay: const Duration(milliseconds: 80),
                   child: MethodCard(
-                    // Official GitHub mark (solid) — tinted to match the
-                    // theme in dark mode.
-                    leading: Builder(builder: (context) {
-                      final dark =
-                          Theme.of(context).brightness == Brightness.dark;
-                      return Image.asset(
-                        'assets/brand_icons/github_mark.png',
-                        width: 26,
-                        height: 26,
-                        color: dark ? Colors.white : null,
-                      );
-                    }),
+                    // GitHub's mark is monochrome by design, so it takes the
+                    // theme's text colour rather than staying black.
+                    leading: BrandIcon.github(size: 22, tint: o.text),
                     title: 'Continue with GitHub',
                     subtitle: 'Opens your browser to sign in',
-                    primary: false,
                     onTap: () => _social(SocialProvider.github),
                   ),
                 ),
-                const SizedBox(height: 12),
-                FadeSlideIn(
+                const SizedBox(height: Space.md),
+                FadeIn(
                   delay: const Duration(milliseconds: 120),
                   child: MethodCard(
-                    icon: Icons.alternate_email,
+                    icon: Iconsax.sms_copy,
                     title: 'Email & password',
                     subtitle: 'The credentials you used on the web app',
-                    primary: false,
                     onTap: _email,
                   ),
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  'With account sign-in, transactions are authorized by the '
-                  'Omnia server on your behalf. For full self-custody, create '
-                  'a wallet with a recovery phrase instead.',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                const SizedBox(height: Space.xxl),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Iconsax.info_circle_copy, size: 16, color: o.textLow),
+                    const SizedBox(width: Space.md - 2),
+                    Expanded(
+                      child: Text(
+                        'With account sign-in, transactions are authorized by '
+                        'the Omnia server on your behalf. For full '
+                        'self-custody, create a wallet with a recovery phrase '
+                        'instead.',
+                        style: theme.textTheme.bodySmall
+                            ?.copyWith(color: o.textLow),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],
@@ -237,64 +246,16 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
   }
 }
 
-class _EmailDialog extends StatefulWidget {
-  const _EmailDialog();
-
-  @override
-  State<_EmailDialog> createState() => _EmailDialogState();
-}
-
-class _EmailDialogState extends State<_EmailDialog> {
-  final _email = TextEditingController();
-  final _password = TextEditingController();
-  bool _obscure = true;
-
-  @override
-  void dispose() {
-    _email.dispose();
-    _password.dispose();
-    super.dispose();
-  }
-
+class _Unavailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Sign in with email'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _email,
-            autofocus: true,
-            keyboardType: TextInputType.emailAddress,
-            autocorrect: false,
-            decoration: const InputDecoration(labelText: 'Email'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _password,
-            obscureText: _obscure,
-            decoration: InputDecoration(
-              labelText: 'Password',
-              suffixIcon: IconButton(
-                icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscure = !_obscure),
-              ),
-            ),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () =>
-              Navigator.of(context).pop((_email.text.trim(), _password.text)),
-          child: const Text('Sign in'),
-        ),
-      ],
+    return OmniaEmptyState(
+      icon: Iconsax.slash_copy,
+      title: 'Sign-in unavailable',
+      message: 'This build has no account backend configured. Create or '
+          'import a self-custody wallet instead.',
+      actionLabel: 'Go back',
+      onAction: () => Navigator.of(context).maybePop(),
     );
   }
 }

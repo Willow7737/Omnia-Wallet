@@ -1,0 +1,6 @@
+# The `preview` suite renders every screen to a PNG under build/preview/ as a
+# development aid. It writes files and asserts nothing, so it stays out of the
+# default `flutter test` run and is opted into with `--tags preview`.
+tags:
+  preview:
+    skip: "run with: flutter test --tags preview test/golden_preview_test.dart"

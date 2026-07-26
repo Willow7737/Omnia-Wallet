@@ -1,0 +1,42 @@
+<svg width="320" height="320" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hero backdrop behind the brand mark on the onboarding "choose a method"
+       screen.
+
+       Replaces hero_dots.svg, which drew ~400 hand-unrolled <circle> elements
+       in #8A8A8A at fill-opacity 0.08 over a #2563EB radial glow — invisible
+       against a dark background, and 28 KB of markup for the privilege.
+
+       Everything here paints in `currentColor` at explicit opacities, so the
+       whole illustration tracks whatever tint the call site supplies and works
+       on light, dim and true-black alike. -->
+  <defs>
+    <radialGradient id="halo" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="currentColor" stop-opacity="0.22"/>
+      <stop offset="45%" stop-color="currentColor" stop-opacity="0.08"/>
+      <stop offset="80%" stop-color="currentColor" stop-opacity="0.02"/>
+      <stop offset="100%" stop-color="currentColor" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- A 16pt dot grid, tiled rather than unrolled. -->
+    <pattern id="dots" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+      <circle cx="8" cy="8" r="1.4" fill="currentColor" fill-opacity="0.30"/>
+    </pattern>
+
+    <!-- Fades the grid out towards the edges so it has no hard border. -->
+    <radialGradient id="fade" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"  stop-color="#FFFFFF" stop-opacity="1"/>
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="fadeMask">
+      <rect width="320" height="320" fill="url(#fade)"/>
+    </mask>
+  </defs>
+
+  <circle cx="160" cy="160" r="158" fill="url(#halo)"/>
+  <rect width="320" height="320" fill="url(#dots)" mask="url(#fadeMask)"/>
+
+  <!-- Two concentric rings give the mark something to sit inside. -->
+  <circle cx="160" cy="160" r="72"  fill="none" stroke="currentColor" stroke-opacity="0.16" stroke-width="1"/>
+  <circle cx="160" cy="160" r="108" fill="none" stroke="currentColor" stroke-opacity="0.10" stroke-width="1"/>
+</svg>

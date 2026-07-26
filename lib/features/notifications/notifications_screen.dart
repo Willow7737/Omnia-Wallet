@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 import '../../core/format.dart';
-import '../../core/haptics.dart';
 import '../../core/theme.dart';
-import '../../core/widgets/fade_slide_in.dart';
+import '../../core/ui/avatar.dart';
+import '../../core/ui/button.dart';
+import '../../core/ui/header.dart';
+import '../../core/ui/list_row.dart';
+import '../../core/ui/sheet.dart';
+import '../../core/ui/states.dart';
 import '../../state/notices.dart';
+import '../shell/app_shell.dart';
 
 /// The in-app notification feed: transactions, votes, wallet events, news.
 class NotificationsScreen extends ConsumerStatefulWidget {
@@ -20,8 +26,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   @override
   void initState() {
     super.initState();
-    // Opening the feed clears the badge — after the first frame so the
-    // unread indicators are visible for a beat.
+    // Opening the feed clears the badge — but only after a beat, so the unread
+    // markers are actually visible before they fade.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future<void>.delayed(const Duration(milliseconds: 1200), () {
         if (mounted) ref.read(noticesProvider.notifier).markAllRead();
@@ -29,55 +35,51 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     });
   }
 
+  Future<void> _clear() async {
+    final confirmed = await showOmniaConfirm(
+      context,
+      icon: Iconsax.trash_copy,
+      title: 'Clear notifications?',
+      message: 'This removes every notification from this device.',
+      confirmLabel: 'Clear all',
+      destructive: true,
+    );
+    if (confirmed) {
+      await ref.read(noticesProvider.notifier).clear();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final o = context.omnia;
     final notices = ref.watch(noticesProvider);
-    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
+      backgroundColor: o.bg,
+      appBar: OmniaHeader(
+        title: 'Notifications',
+        showBack: false,
         actions: [
           if (notices.isNotEmpty)
-            TextButton(
-              onPressed: () {
-                Haptics.light();
-                ref.read(noticesProvider.notifier).clear();
-              },
-              child: const Text('Clear'),
+            OmniaIconButton(
+              icon: Iconsax.trash_copy,
+              tooltip: 'Clear all',
+              onTap: _clear,
             ),
         ],
       ),
       body: notices.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.notifications_none,
-                    size: 56,
-                    color: theme.colorScheme.outlineVariant,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Nothing yet',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Sends, votes, and news will show up here.',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-                  ),
-                ],
-              ),
+          ? const OmniaEmptyState(
+              icon: Iconsax.notification_copy,
+              title: 'Nothing yet',
+              message: 'Sends, votes and news will show up here.',
             )
           : ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: EdgeInsets.only(bottom: tabBarInset(context) + Space.xl),
               itemCount: notices.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (context, i) => FadeSlideIn(
-                delay: Duration(milliseconds: 30 * i.clamp(0, 8)),
+              separatorBuilder: (_, __) => const Hairline(indent: 68),
+              itemBuilder: (_, i) => FadeIn(
+                delay: FadeIn.stagger(i),
                 child: _NoticeTile(notice: notices[i]),
               ),
             ),
@@ -85,69 +87,77 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 }
 
-class _NoticeTile extends ConsumerWidget {
+class _NoticeTile extends StatelessWidget {
   const _NoticeTile({required this.notice});
+
   final AppNotice notice;
 
   (IconData, Color) _style(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final omnia = context.omnia;
+    final o = context.omnia;
     return switch (notice.type) {
-      NoticeType.sent => (Icons.arrow_upward, scheme.primary),
-      NoticeType.vote => (Icons.how_to_vote_outlined, omnia.success),
-      NoticeType.wallet => (
-          Icons.account_balance_wallet_outlined,
-          scheme.onSurfaceVariant
-        ),
-      NoticeType.news => (Icons.campaign_outlined, omnia.warning),
+      NoticeType.sent => (Iconsax.arrow_up_3_copy, o.negative),
+      NoticeType.vote => (Iconsax.chart_2_copy, o.positive),
+      NoticeType.wallet => (Iconsax.wallet_copy, o.textMedium),
+      NoticeType.news => (Iconsax.global_copy, o.accent),
     };
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final o = context.omnia;
     final theme = Theme.of(context);
     final (icon, tint) = _style(context);
+    final unread = !notice.read;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      leading: CircleAvatar(
-        backgroundColor: tint.withValues(alpha: 0.14),
-        child: Icon(icon, color: tint, size: 22),
+    return Container(
+      // Unread rows carry a faint accent wash — the same cue Bluesky uses on
+      // an unread notification, and quieter than a coloured dot on every row.
+      color: unread ? o.accent.withValues(alpha: 0.08) : null,
+      padding: const EdgeInsets.symmetric(
+        horizontal: Space.lg,
+        vertical: Space.md + 2,
       ),
-      title: Text(
-        notice.title,
-        style: theme.textTheme.titleSmall?.copyWith(
-          fontWeight: notice.read ? FontWeight.w500 : FontWeight.w700,
-        ),
-      ),
-      subtitle: Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: Text(
-          notice.body,
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-        ),
-      ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            Fmt.relative(notice.dateTime),
-            style: theme.textTheme.labelSmall
-                ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          if (!notice.read) ...[
-            const SizedBox(height: 6),
-            Container(
-              width: 9,
-              height: 9,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-                shape: BoxShape.circle,
-              ),
+          IconAvatar(icon: icon, tint: tint),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        notice.title,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          fontSize: FontSizes.md,
+                          fontWeight: unread ? Weights.bold : Weights.medium,
+                          height: LineHeights.snug,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: Space.sm),
+                    Text(
+                      Fmt.relative(notice.dateTime),
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: o.textLow),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  notice.body,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: o.textMedium,
+                    height: LineHeights.snug,
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ],
       ),
     );

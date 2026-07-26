@@ -28,6 +28,17 @@ final newsPostsProvider = FutureProvider<List<NewsPost>>((ref) async {
   return posts;
 });
 
+/// Whether the News tab should show its unread dot.
+///
+/// Derived from the notice feed rather than tracked separately: the feed
+/// already files a `news` notice for every post the user hasn't seen, so this
+/// stays correct without a second source of truth to keep in sync.
+final hasUnreadNewsProvider = Provider<bool>((ref) {
+  return ref
+      .watch(noticesProvider)
+      .any((n) => n.type == NoticeType.news && !n.read);
+});
+
 /// Replies for one post, oldest first (threaded reading order).
 final newsRepliesProvider =
     FutureProvider.family<List<NewsReply>, String>((ref, postId) async {

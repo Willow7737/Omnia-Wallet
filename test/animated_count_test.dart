@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:omnia_wallet/core/widgets/animated_count.dart';
+import 'package:omnia_wallet/core/ui/amount.dart';
 
 void main() {
   testWidgets('AnimatedCount settles on the final formatted value',

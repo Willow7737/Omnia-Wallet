@@ -150,6 +150,12 @@ class AppConfig {
   static const String kLastSeenNewsKey = 'omnia.wallet.last_seen_news';
   static const String kAvatarPathKey = 'omnia.wallet.avatar_path';
 
+  /// Appearance: which of Light / Dim / Dark the user picked.
+  static const String kThemeKey = 'omnia.wallet.theme';
+
+  /// Whether haptic feedback is on. Defaults to on when unset.
+  static const String kHapticsKey = 'omnia.wallet.haptics';
+
   /// Locally-blocked authors (JSON list of identifiers) — content moderation.
   /// Blocking is client-side only: nothing is sent to the node.
   static const String kBlockedUsersKey = 'omnia.wallet.blocked_users';

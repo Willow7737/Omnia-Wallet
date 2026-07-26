@@ -2,14 +2,14 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../data/models.dart';
+import '../data/news.dart';
+import '../features/about/about_screen.dart';
 import '../features/contacts/contacts_screen.dart';
 import '../features/governance/governance_screen.dart';
 import '../features/history/history_screen.dart';
-import '../features/home/home_screen.dart';
-import '../data/models.dart';
-import '../data/news.dart';
 import '../features/history/transaction_screen.dart';
-import '../features/about/about_screen.dart';
+import '../features/home/home_screen.dart';
 import '../features/moderation/safety_screen.dart';
 import '../features/network/network_screen.dart';
 import '../features/news/news_post_screen.dart';
@@ -18,28 +18,53 @@ import '../features/notifications/notifications_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/receive/receive_screen.dart';
+import '../features/send/scan_did_screen.dart';
 import '../features/send/send_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/shell/app_shell.dart';
 import '../features/signin/signin_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../state/providers.dart';
 import 'motion.dart';
 
-/// Wrap a screen in the shared fade-through transition.
-Page<void> _page(GoRouterState state, Widget child) => fadeThroughPage<void>(
+/// A pushed screen: slides in over the tab shell.
+Page<void> _push(GoRouterState state, Widget child) => pushPage<void>(
       key: state.pageKey,
       name: state.name ?? state.matchedLocation,
       child: child,
     );
 
+/// A tab root: cross-fades, because tabs are peers and horizontal travel would
+/// imply a hierarchy that isn't there.
+Page<void> _tab(GoRouterState state, Widget child) => fadePage<void>(
+      key: state.pageKey,
+      name: state.name ?? state.matchedLocation,
+      child: child,
+    );
+
+/// A full-screen takeover that rises from the bottom edge.
+Page<void> _modal(GoRouterState state, Widget child) => modalPage<void>(
+      key: state.pageKey,
+      name: state.name ?? state.matchedLocation,
+      child: child,
+    );
+
+final _rootKey = GlobalKey<NavigatorState>(debugLabel: 'root');
+
 /// Builds the app router.
 ///
-/// Start at a splash while we asynchronously determine whether a wallet
-/// exists, so a first-time user is routed straight to onboarding instead of
-/// flashing the (empty) Home screen. [refresh] re-runs the redirect when the
-/// wallet-existence state resolves or changes.
+/// The signed-in app lives inside a [StatefulShellRoute] with one branch per
+/// tab, so each tab keeps its own stack and scroll position. Screens that are
+/// *not* tab roots (Send, Receive, a transaction, Settings…) are pushed onto
+/// the **root** navigator so they cover the tab bar — which is how Bluesky
+/// handles its composer and detail screens.
+///
+/// Start at a splash while wallet existence resolves asynchronously, so a
+/// first-time user routes straight to onboarding instead of flashing an empty
+/// Home. [refresh] re-runs the redirect when that state settles.
 GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
   return GoRouter(
+    navigatorKey: _rootKey,
     initialLocation: '/splash',
     refreshListenable: refresh,
     redirect: (context, state) {
@@ -67,82 +92,126 @@ GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
     routes: [
       GoRoute(
         path: '/splash',
-        pageBuilder: (_, s) => _page(s, const SplashScreen()),
-      ),
-      GoRoute(
-        path: '/',
-        pageBuilder: (_, s) => _page(s, const HomeScreen()),
+        pageBuilder: (_, s) => _tab(s, const SplashScreen()),
       ),
       GoRoute(
         path: '/onboarding',
-        pageBuilder: (_, s) => _page(s, const OnboardingScreen()),
+        pageBuilder: (_, s) => _tab(s, const OnboardingScreen()),
       ),
       GoRoute(
         path: '/signin',
-        pageBuilder: (_, s) => _page(s, const SignInScreen()),
+        pageBuilder: (_, s) => _push(s, const SignInScreen()),
       ),
+
+      // ---- the tab shell ----
+      StatefulShellRoute.indexedStack(
+        builder: (_, __, shell) => AppShell(shell: shell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/',
+                pageBuilder: (_, s) => _tab(s, const HomeScreen()),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/activity',
+                pageBuilder: (_, s) => _tab(s, const HistoryScreen()),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/news',
+                pageBuilder: (_, s) => _tab(s, const NewsScreen()),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/notifications',
+                pageBuilder: (_, s) => _tab(s, const NotificationsScreen()),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile',
+                pageBuilder: (_, s) => _tab(s, const ProfileScreen()),
+              ),
+            ],
+          ),
+        ],
+      ),
+
+      // ---- pushed over the shell (root navigator) ----
       GoRoute(
         path: '/send',
-        pageBuilder: (_, s) => _page(s, const SendScreen()),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const SendScreen()),
       ),
       GoRoute(
         path: '/receive',
-        pageBuilder: (_, s) => _page(s, const ReceiveScreen()),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const ReceiveScreen()),
       ),
       GoRoute(
-        path: '/history',
-        pageBuilder: (_, s) => _page(s, const HistoryScreen()),
+        path: '/scan',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _modal(s, const ScanDidScreen()),
       ),
       GoRoute(
         path: '/settings',
-        pageBuilder: (_, s) => _page(s, const SettingsScreen()),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const SettingsScreen()),
       ),
       GoRoute(
         path: '/contacts',
-        pageBuilder: (_, s) => _page(s, const ContactsScreen()),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const ContactsScreen()),
       ),
       GoRoute(
         path: '/governance',
-        pageBuilder: (_, s) => _page(s, const GovernanceScreen()),
-      ),
-      GoRoute(
-        path: '/profile',
-        pageBuilder: (_, s) => _page(s, const ProfileScreen()),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const GovernanceScreen()),
       ),
       GoRoute(
         path: '/network',
-        pageBuilder: (_, s) => _page(s, const NetworkScreen()),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const NetworkScreen()),
       ),
       GoRoute(
         path: '/safety',
-        pageBuilder: (_, s) => _page(s, const SafetyScreen()),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const SafetyScreen()),
       ),
       GoRoute(
         path: '/about',
-        pageBuilder: (_, s) => _page(s, const AboutScreen()),
-      ),
-      GoRoute(
-        path: '/notifications',
-        pageBuilder: (_, s) => _page(s, const NotificationsScreen()),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const AboutScreen()),
       ),
       GoRoute(
         path: '/tx',
-        // Tiles pass the record along; a bare deep link goes to History.
-        redirect: (context, s) => s.extra is TransferRecord ? null : '/history',
+        parentNavigatorKey: _rootKey,
+        // Tiles pass the record along; a bare deep link goes to Activity.
+        redirect: (_, s) => s.extra is TransferRecord ? null : '/activity',
         pageBuilder: (_, s) =>
-            _page(s, TransactionScreen(record: s.extra! as TransferRecord)),
+            _push(s, TransactionScreen(record: s.extra! as TransferRecord)),
       ),
       GoRoute(
-        path: '/news',
-        pageBuilder: (_, s) => _page(s, const NewsScreen()),
-      ),
-      GoRoute(
-        path: '/news/:id',
-        // The feed passes the post along; a bare deep link falls back to
-        // the feed rather than fetching a single post.
-        redirect: (context, s) => s.extra is NewsPost ? null : '/news',
+        path: '/post',
+        parentNavigatorKey: _rootKey,
+        // The feed passes the post along; a bare deep link falls back to the
+        // feed rather than fetching a single post.
+        redirect: (_, s) => s.extra is NewsPost ? null : '/news',
         pageBuilder: (_, s) =>
-            _page(s, NewsPostScreen(post: s.extra! as NewsPost)),
+            _push(s, NewsPostScreen(post: s.extra! as NewsPost)),
       ),
     ],
   );
