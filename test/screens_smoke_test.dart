@@ -7,6 +7,7 @@ import 'package:omnia_wallet/crypto/secure_store.dart';
 import 'package:omnia_wallet/data/governance.dart';
 import 'package:omnia_wallet/data/models.dart';
 import 'package:omnia_wallet/data/news.dart';
+import 'package:omnia_wallet/features/about/about_screen.dart';
 import 'package:omnia_wallet/features/contacts/contacts_screen.dart';
 import 'package:omnia_wallet/features/governance/governance_screen.dart';
 import 'package:omnia_wallet/features/history/history_screen.dart';
@@ -176,6 +177,7 @@ void main() {
     'Governance': const GovernanceScreen(),
     'Network': const NetworkScreen(),
     'Safety': const SafetyScreen(),
+    'About': const AboutScreen(),
     'Splash': const SplashScreen(),
     'Transaction': TransactionScreen(record: history().first),
   };

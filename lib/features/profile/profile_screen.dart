@@ -77,6 +77,14 @@ class ProfileScreen extends ConsumerWidget {
               const Hairline(),
 
               OmniaRow(
+                title: 'What is Omnia?',
+                subtitle: 'A plain-language guide to the app and UBC',
+                icon: Iconsax.message_question_copy,
+                chevron: true,
+                onTap: () => context.push('/about'),
+              ),
+              const Hairline(indent: Space.lg),
+              OmniaRow(
                 title: 'Show my QR code',
                 subtitle: 'Let someone scan your DID',
                 icon: Iconsax.scan_copy,

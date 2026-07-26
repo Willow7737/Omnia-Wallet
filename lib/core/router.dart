@@ -4,12 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../data/models.dart';
 import '../data/news.dart';
+import '../features/about/about_screen.dart';
 import '../features/contacts/contacts_screen.dart';
 import '../features/governance/governance_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/history/transaction_screen.dart';
 import '../features/home/home_screen.dart';
-import '../features/about/about_screen.dart';
 import '../features/moderation/safety_screen.dart';
 import '../features/network/network_screen.dart';
 import '../features/news/news_post_screen.dart';
@@ -190,15 +190,11 @@ GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
         path: '/safety',
         parentNavigatorKey: _rootKey,
         pageBuilder: (_, s) => _push(s, const SafetyScreen()),
-        pageBuilder: (_, s) => _page(s, const SafetyScreen()),
       ),
       GoRoute(
         path: '/about',
-        pageBuilder: (_, s) => _page(s, const AboutScreen()),
-      ),
-      GoRoute(
-        path: '/notifications',
-        pageBuilder: (_, s) => _page(s, const NotificationsScreen()),
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const AboutScreen()),
       ),
       GoRoute(
         path: '/tx',

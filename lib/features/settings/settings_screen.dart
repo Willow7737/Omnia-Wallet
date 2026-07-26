@@ -45,55 +45,6 @@ class SettingsScreen extends ConsumerWidget {
             icon: Iconsax.mobile_copy,
             value: hapticsOn,
             onChanged: (v) => ref.read(hapticsEnabledProvider.notifier).set(v),
-          const _SectionHeader('Identity'),
-          identityAsync.when(
-            loading: () => const ListTile(title: Text('Loading…')),
-            error: (e, _) => ListTile(title: Text('Error: $e')),
-            data: (identity) => ListTile(
-              title: const Text('Your DID'),
-              subtitle: Text(identity?.did ?? 'No wallet'),
-              trailing: const Icon(Icons.copy, size: 18),
-              onTap: identity == null
-                  ? null
-                  : () {
-                      Haptics.selection();
-                      Clipboard.setData(ClipboardData(text: identity.did));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('DID copied')),
-                      );
-                    },
-            ),
-          ),
-          const Divider(),
-          const _SectionHeader('General'),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('What is Omnia?'),
-            subtitle: const Text('A plain-language guide to the app and UBC'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/about'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.contacts_outlined),
-            title: const Text('Address book'),
-            subtitle: const Text('Saved recipient DIDs'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/contacts'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.shield_outlined),
-            title: const Text('Safety'),
-            subtitle: const Text('Community guidelines & blocked accounts'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => context.push('/safety'),
-          ),
-          const Divider(),
-          const _SectionHeader('Node'),
-          ListTile(
-            title: const Text('Node endpoint'),
-            subtitle: Text(nodeUrl),
-            trailing: const Icon(Icons.edit_outlined, size: 18),
-            onTap: () => _editNodeUrl(context, ref, nodeUrl),
           ),
           const Hairline(),
 
@@ -134,6 +85,24 @@ class SettingsScreen extends ConsumerWidget {
             icon: Iconsax.status_up_copy,
             chevron: true,
             onTap: () => context.push('/network'),
+          ),
+          const Hairline(),
+
+          const OmniaSectionLabel('About'),
+          OmniaRow(
+            title: 'What is Omnia?',
+            subtitle: 'A plain-language guide to the app and UBC',
+            icon: Iconsax.message_question_copy,
+            chevron: true,
+            onTap: () => context.push('/about'),
+          ),
+          const Hairline(indent: Space.lg),
+          OmniaRow(
+            title: 'Safety',
+            subtitle: 'Community guidelines and blocked accounts',
+            icon: Iconsax.shield_tick_copy,
+            chevron: true,
+            onTap: () => context.push('/safety'),
           ),
           const Hairline(),
 
