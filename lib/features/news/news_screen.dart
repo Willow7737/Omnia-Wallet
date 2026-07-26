@@ -8,14 +8,13 @@ import '../../core/brand/brand.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
-import '../../core/motion.dart';
 import '../../core/theme.dart';
-import '../../core/ui/button.dart';
 import '../../core/ui/header.dart';
 import '../../core/ui/list_row.dart';
 import '../../core/ui/press.dart';
 import '../../core/ui/sheet.dart';
 import '../../core/ui/states.dart';
+import '../../core/ui/thread.dart';
 import '../../data/news.dart';
 import '../../state/news.dart';
 import '../shell/app_shell.dart';
@@ -155,6 +154,18 @@ class NewsPostCard extends ConsumerWidget {
   final NewsPost post;
   final bool full;
 
+  /// Copy the post to the clipboard. There is no public web permalink yet, so
+  /// "share" is a copy — which is what the overflow menu already offered.
+  Future<void> _share(BuildContext context) async {
+    Haptics.selection();
+    await Clipboard.setData(
+      ClipboardData(text: '${post.title}\n\n${post.body}'),
+    );
+    if (context.mounted) {
+      showOmniaToast(context, message: 'Post copied');
+    }
+  }
+
   Future<void> _menu(BuildContext context, WidgetRef ref) async {
     final action = await showOmniaMenu<String>(
       context,
@@ -221,27 +232,12 @@ class NewsPostCard extends ConsumerWidget {
                   child: const BrandMark(size: 17),
                 ),
                 const SizedBox(width: Space.sm + 2),
-                Flexible(
-                  child: Text(
-                    post.author,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium,
+                Expanded(
+                  child: ThreadHeader(
+                    name: post.author,
+                    timestamp: '· ${Fmt.relative(post.createdAt)}',
+                    onMore: () => _menu(context, ref),
                   ),
-                ),
-                const SizedBox(width: Space.xs + 2),
-                Text(
-                  '· ${Fmt.relative(post.createdAt)}',
-                  style: theme.textTheme.labelSmall?.copyWith(color: o.textLow),
-                ),
-                const Spacer(),
-                OmniaIconButton(
-                  icon: Iconsax.more_copy,
-                  size: 18,
-                  box: 34,
-                  color: o.textLow,
-                  tooltip: 'More',
-                  onTap: () => _menu(context, ref),
                 ),
               ],
             ),
@@ -282,21 +278,12 @@ class NewsPostCard extends ConsumerWidget {
               ),
             ],
 
-            const SizedBox(height: Space.sm),
-            // Bluesky's action row: icon + count, low contrast, widely spaced,
-            // left-aligned rather than pushed to the right edge.
+            const SizedBox(height: Space.xs),
+            // Threads' action row: left-aligned, evenly spaced, each count set
+            // immediately beside its own glyph.
             Row(
               children: [
-                _Action(
-                  icon: Iconsax.message_copy,
-                  count: post.replyCount,
-                  label: 'Replies',
-                  onTap: () {
-                    if (!full) context.push('/post', extra: post);
-                  },
-                ),
-                const SizedBox(width: Space.x4l),
-                _LikeAction(
+                ThreadLikeAction(
                   liked: liked,
                   onTap: () {
                     Haptics.selection();
@@ -306,110 +293,25 @@ class NewsPostCard extends ConsumerWidget {
                     notifier.state = next;
                   },
                 ),
+                const SizedBox(width: ThreadAction.gap),
+                ThreadAction(
+                  icon: Iconsax.message_copy,
+                  count: post.replyCount,
+                  label: 'Replies',
+                  onTap: () {
+                    if (!full) context.push('/post', extra: post);
+                  },
+                ),
+                const SizedBox(width: ThreadAction.gap),
+                ThreadAction(
+                  icon: Iconsax.send_2_copy,
+                  label: 'Share',
+                  onTap: () => _share(context),
+                ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _Action extends StatelessWidget {
-  const _Action({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.count,
-    this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final int? count;
-  final Color? color;
-
-  @override
-  Widget build(BuildContext context) {
-    final o = context.omnia;
-    final tint = color ?? o.textLow;
-    return Pressable(
-      onTap: onTap,
-      feel: PressFeel.subtle,
-      semanticLabel: label,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: Space.sm),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 17, color: tint),
-            if ((count ?? 0) > 0) ...[
-              const SizedBox(width: Space.xs + 2),
-              Text(
-                '$count',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: FontSizes.sm,
-                  color: tint,
-                  fontFeatures: kTabularFigures,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// The heart, with the little pop Bluesky gives it on the way in.
-class _LikeAction extends StatefulWidget {
-  const _LikeAction({required this.liked, required this.onTap});
-
-  final bool liked;
-  final VoidCallback onTap;
-
-  @override
-  State<_LikeAction> createState() => _LikeActionState();
-}
-
-class _LikeActionState extends State<_LikeAction>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: Motion.fast,
-    lowerBound: 1.0,
-    upperBound: 1.35,
-  );
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  void _tap() {
-    // Only the *liking* direction pops. Un-liking with a flourish would
-    // celebrate the wrong thing.
-    if (!widget.liked) {
-      _c.forward(from: 1.0).then((_) {
-        if (mounted) _c.reverse();
-      });
-    }
-    widget.onTap();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final o = context.omnia;
-    return ScaleTransition(
-      scale: _c,
-      child: _Action(
-        icon: widget.liked ? Iconsax.heart : Iconsax.heart_copy,
-        label: 'Like',
-        color: widget.liked ? o.like : null,
-        onTap: _tap,
       ),
     );
   }

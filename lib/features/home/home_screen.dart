@@ -390,7 +390,9 @@ class _RecentActivity extends ConsumerWidget {
             compact: true,
           );
         }
-        final recent = records.reversed.take(6).toList();
+        // Already newest-first from historyProvider, so this really is
+        // the six most recent transfers.
+        final recent = records.take(6).toList();
         return Column(
           children: [
             for (var i = 0; i < recent.length; i++)

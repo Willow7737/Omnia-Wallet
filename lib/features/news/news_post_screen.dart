@@ -18,6 +18,7 @@ import '../../core/ui/list_row.dart';
 import '../../core/ui/press.dart';
 import '../../core/ui/sheet.dart';
 import '../../core/ui/states.dart';
+import '../../core/ui/thread.dart';
 import '../../data/news.dart';
 import '../../state/blocklist.dart';
 import '../../state/news.dart';
@@ -698,9 +699,14 @@ class _SignInHint extends StatelessWidget {
 // Thread
 // ---------------------------------------------------------------------------
 
-/// Renders the reply list with one level of nesting: top-level replies in
-/// order, children indented beneath their parent.
-class _ThreadedReplies extends StatelessWidget {
+/// The reply list, laid out the way Threads lays out a conversation.
+///
+/// Top-level replies run down the page, each carrying a hairline rail from its
+/// avatar to the next item so the whole thing reads as one thread. Answers to
+/// a reply indent under it with a smaller avatar, and a run of more than
+/// [_collapseAfter] answers collapses behind a "Show replies" row rather than
+/// pushing the rest of the conversation off screen.
+class _ThreadedReplies extends StatefulWidget {
   const _ThreadedReplies({
     required this.replies,
     required this.myUserId,
@@ -717,20 +723,31 @@ class _ThreadedReplies extends StatelessWidget {
   final void Function(NewsReply) onReply;
   final Future<void> Function(NewsReply, {required bool isMine}) onMenu;
 
+  @override
+  State<_ThreadedReplies> createState() => _ThreadedRepliesState();
+}
+
+class _ThreadedRepliesState extends State<_ThreadedReplies> {
+  /// How many answers to show before collapsing the rest.
+  static const int _collapseAfter = 2;
+
+  /// Parent ids whose collapsed run the user has expanded.
+  final Set<String> _expanded = {};
+
   bool _isBlocked(NewsReply r) {
     final key = blockKeyFor(userId: r.userId, name: r.authorName);
-    return key != null && blocked.contains(key);
+    return key != null && widget.blocked.contains(key);
   }
 
   @override
   Widget build(BuildContext context) {
     // Hide replies from blocked authors (client-side moderation).
-    final visible = replies.where((r) => !_isBlocked(r)).toList();
+    final visible = widget.replies.where((r) => !_isBlocked(r)).toList();
     if (visible.isEmpty) {
       return OmniaEmptyState(
         icon: Iconsax.message_copy,
-        title: replies.isEmpty ? 'No replies yet' : 'No replies to show',
-        message: replies.isEmpty
+        title: widget.replies.isEmpty ? 'No replies yet' : 'No replies to show',
+        message: widget.replies.isEmpty
             ? 'Start the conversation.'
             : 'The replies here are from people you blocked.',
         compact: true,
@@ -753,42 +770,71 @@ class _ThreadedReplies extends StatelessWidget {
     for (var i = 0; i < topLevel.length; i++) {
       final parent = topLevel[i];
       final children = byParent[parent.id] ?? const <NewsReply>[];
+      final isLastTop = i == topLevel.length - 1;
+
+      final expanded = _expanded.contains(parent.id);
+      final shown = (children.length > _collapseAfter && !expanded)
+          ? children.take(_collapseAfter).toList()
+          : children;
+      final hidden = children.length - shown.length;
+
       rows.add(_ReplyRow(
         reply: parent,
-        isLast: i == topLevel.length - 1 && children.isEmpty,
-        isMine: myUserId != null && parent.userId == myUserId,
-        canInteract: canInteract,
-        onReply: onReply,
-        onMenu: onMenu,
+        // The rail continues while anything in this thread is still to come.
+        railBelow: !(isLastTop && children.isEmpty),
+        isMine: widget.myUserId != null && parent.userId == widget.myUserId,
+        canInteract: widget.canInteract,
+        onReply: widget.onReply,
+        onMenu: widget.onMenu,
       ));
-      for (var j = 0; j < children.length; j++) {
+
+      for (var j = 0; j < shown.length; j++) {
+        final isLastChild = j == shown.length - 1;
         rows.add(Padding(
-          padding: const EdgeInsets.only(left: Space.x4l + Space.sm),
+          padding: const EdgeInsets.only(left: _ReplyRow.nestIndent),
           child: _ReplyRow(
-            reply: children[j],
-            isLast: i == topLevel.length - 1 && j == children.length - 1,
-            isMine: myUserId != null && children[j].userId == myUserId,
-            canInteract: canInteract,
-            onReply: onReply,
-            onMenu: onMenu,
+            reply: shown[j],
+            railBelow: !(isLastTop && isLastChild && hidden == 0),
+            isMine:
+                widget.myUserId != null && shown[j].userId == widget.myUserId,
+            canInteract: widget.canInteract,
+            onReply: widget.onReply,
+            onMenu: widget.onMenu,
             nested: true,
           ),
         ));
       }
+
+      if (hidden > 0) {
+        rows.add(ThreadMoreReplies(
+          indent: _ReplyRow.nestIndent,
+          label:
+              hidden == 1 ? 'Show 1 more reply' : 'Show $hidden more replies',
+          avatars: [
+            for (final r in children.skip(shown.length))
+              Identicon(seed: r.authorDid ?? r.authorName, size: 18),
+          ],
+          onTap: () {
+            Haptics.selection();
+            setState(() => _expanded.add(parent.id));
+          },
+        ));
+      }
     }
+
     return Padding(
-      padding: const EdgeInsets.only(left: Space.lg, right: Space.lg),
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
       child: Column(children: rows),
     );
   }
 }
 
-/// One reply: avatar + connector line on the left, name/time/body on the
-/// right, a small action row underneath.
+/// One item in the thread: avatar and rail on the left, identity/body/actions
+/// on the right, overflow pinned to the far right.
 class _ReplyRow extends StatelessWidget {
   const _ReplyRow({
     required this.reply,
-    required this.isLast,
+    required this.railBelow,
     required this.isMine,
     required this.canInteract,
     required this.onReply,
@@ -797,12 +843,17 @@ class _ReplyRow extends StatelessWidget {
   });
 
   final NewsReply reply;
-  final bool isLast;
+  final bool railBelow;
   final bool isMine;
   final bool canInteract;
   final bool nested;
   final void Function(NewsReply) onReply;
   final Future<void> Function(NewsReply, {required bool isMine}) onMenu;
+
+  /// How far an answer indents under the reply it answers. Matches the width
+  /// of the parent's avatar column plus its gutter, so a child's rail lines up
+  /// inside its parent's.
+  static const double nestIndent = 34 + Space.md;
 
   @override
   Widget build(BuildContext context) {
@@ -814,64 +865,33 @@ class _ReplyRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Avatar column with the thread connector running down from it.
-          Column(
-            children: [
-              Container(
-                width: avatarSize,
-                height: avatarSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: o.borderLow),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Identicon(
-                  seed: reply.authorDid ?? reply.authorName,
-                  size: avatarSize,
-                ),
+          ThreadRail(
+            size: avatarSize,
+            railBelow: railBelow,
+            avatar: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: o.borderLow),
               ),
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    margin: const EdgeInsets.only(top: Space.xs),
-                    color: o.borderLow,
-                  ),
-                ),
-            ],
+              clipBehavior: Clip.antiAlias,
+              child: Identicon(
+                seed: reply.authorDid ?? reply.authorName,
+                size: avatarSize,
+              ),
+            ),
           ),
           const SizedBox(width: Space.md),
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? Space.md : Space.lg),
+              padding: EdgeInsets.only(bottom: railBelow ? Space.sm : Space.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          reply.authorName,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleSmall,
-                        ),
-                      ),
-                      const SizedBox(width: Space.sm),
-                      Text(
-                        Fmt.relative(reply.createdAt),
-                        style: theme.textTheme.labelSmall
-                            ?.copyWith(color: o.textLow),
-                      ),
-                      const Spacer(),
-                      OmniaIconButton(
-                        icon: Iconsax.more_copy,
-                        size: 16,
-                        box: 30,
-                        color: o.textLow,
-                        tooltip: 'More',
-                        onTap: () => onMenu(reply, isMine: isMine),
-                      ),
-                    ],
+                  ThreadHeader(
+                    name: reply.authorName,
+                    timestamp: Fmt.relative(reply.createdAt),
+                    nameStyle: theme.textTheme.titleSmall,
+                    onMore: () => onMenu(reply, isMine: isMine),
                   ),
                   Text(
                     reply.body,
@@ -887,11 +907,9 @@ class _ReplyRow extends StatelessWidget {
                   if (canInteract && !nested)
                     Align(
                       alignment: Alignment.centerLeft,
-                      child: OmniaTextButton(
-                        label: 'Reply',
+                      child: ThreadAction(
                         icon: Iconsax.message_copy,
-                        size: FontSizes.sm,
-                        color: o.textLow,
+                        label: 'Reply',
                         onTap: () => onReply(reply),
                       ),
                     ),

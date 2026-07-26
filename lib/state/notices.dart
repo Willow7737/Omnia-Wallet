@@ -29,6 +29,21 @@ class AppNotice {
   final int timestamp;
   final bool read;
 
+  /// The route tapping this notice opens. A notification you cannot act on is
+  /// just a receipt.
+  ///
+  /// Derived from the type rather than stored per notice: the two screens
+  /// worth deep-linking to — a single transaction and a single post — both
+  /// take their subject as a route `extra` object, which cannot be written
+  /// into a persisted string. So a "sent" notice opens the activity log with
+  /// that transfer at the top, and a news notice opens the feed.
+  String get destination => switch (type) {
+        NoticeType.sent => '/activity',
+        NoticeType.vote => '/governance',
+        NoticeType.wallet => '/settings',
+        NoticeType.news => '/news',
+      };
+
   DateTime get dateTime => DateTime.fromMillisecondsSinceEpoch(timestamp);
 
   AppNotice asRead() => AppNotice(

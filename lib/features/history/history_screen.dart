@@ -98,7 +98,8 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
               );
             }
 
-            final sections = _groupByDay(visible.reversed.toList());
+            // Already newest-first from historyProvider.
+            final sections = _groupByDay(visible);
             return CustomScrollView(
               slivers: [
                 for (final section in sections) ...[

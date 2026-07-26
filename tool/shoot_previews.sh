@@ -13,7 +13,7 @@ THEME="${1:-light}"
 PARALLEL="${2:-4}"
 OUT="build/preview"
 SCREENS=(home activity news notifications profile send receive settings
-         contacts governance network safety transaction about)
+         contacts governance network safety transaction about post)
 
 mkdir -p "$OUT"
 
