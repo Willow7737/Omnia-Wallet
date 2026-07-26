@@ -30,7 +30,7 @@ class GovernanceScreen extends ConsumerWidget {
         title: 'Governance',
         actions: [
           OmniaIconButton(
-            icon: Iconsax.add,
+            icon: Iconsax.add_copy,
             size: 24,
             tooltip: 'New proposal',
             onTap: () => _createProposal(context, ref),
@@ -293,6 +293,11 @@ class _TallyBar extends StatelessWidget {
       child: SizedBox(
         height: 6,
         child: Row(
+          // Stretch, not the default centre alignment. A childless ColoredBox
+          // takes `constraints.smallest`, and a centred Row hands its children
+          // a *loose* height — so every segment collapsed to zero and the bar
+          // rendered as empty space.
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // A zero-vote segment must contribute no flex at all, or Flutter
             // hands it a 1px sliver and the bar shows a colour nobody voted.
@@ -471,7 +476,7 @@ class _NewProposalBodyState extends State<_NewProposalBody> {
                 ),
               ),
               OmniaIconButton(
-                icon: Iconsax.minus_cirlce,
+                icon: Iconsax.minus_cirlce_copy,
                 size: 22,
                 color: _epochs > 1 ? o.text : o.borderHigh,
                 tooltip: 'Fewer epochs',
@@ -492,7 +497,7 @@ class _NewProposalBodyState extends State<_NewProposalBody> {
                 ),
               ),
               OmniaIconButton(
-                icon: Iconsax.add_circle,
+                icon: Iconsax.add_circle_copy,
                 size: 22,
                 color: _epochs < 24 ? o.text : o.borderHigh,
                 tooltip: 'More epochs',

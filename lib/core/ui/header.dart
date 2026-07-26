@@ -77,7 +77,7 @@ class OmniaHeader extends StatelessWidget implements PreferredSizeWidget {
     final Widget? lead = leading ??
         (showBack && canPop
             ? OmniaIconButton(
-                icon: Iconsax.arrow_left_2,
+                icon: Iconsax.arrow_left_2_copy,
                 size: 22,
                 tooltip: 'Back',
                 onTap: onBack ?? () => Navigator.of(context).maybePop(),

@@ -83,7 +83,7 @@ class _LockScreenState extends ConsumerState<LockScreen> {
                       color: o.accent.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Iconsax.lock_1, size: 34, color: o.accent),
+                    child: Icon(Iconsax.lock_1_copy, size: 34, color: o.accent),
                   ),
                 ),
                 const SizedBox(height: Space.xxl),

@@ -82,7 +82,7 @@ class _ContactTile extends ConsumerWidget {
         SheetAction(
           label: 'Delete contact',
           value: 'delete',
-          icon: Iconsax.trash,
+          icon: Iconsax.trash_copy,
           destructive: true,
         ),
       ],
@@ -97,7 +97,7 @@ class _ContactTile extends ConsumerWidget {
           showOmniaToast(
             context,
             message: 'DID copied',
-            icon: Iconsax.copy_success,
+            icon: Iconsax.copy_success_copy,
           );
         }
       case 'edit':
@@ -105,7 +105,7 @@ class _ContactTile extends ConsumerWidget {
       case 'delete':
         final confirmed = await showOmniaConfirm(
           context,
-          icon: Iconsax.trash,
+          icon: Iconsax.trash_copy,
           title: 'Delete contact?',
           message: 'The DID stays valid — this only removes it from your '
               'address book.',
@@ -132,7 +132,7 @@ class _ContactTile extends ConsumerWidget {
         showOmniaToast(
           context,
           message: 'DID copied',
-          icon: Iconsax.copy_success,
+          icon: Iconsax.copy_success_copy,
         );
       },
       onLongPress: () => _menu(context, ref),
@@ -162,11 +162,7 @@ class _ContactTile extends ConsumerWidget {
                   const SizedBox(height: 2),
                   Text(
                     Fmt.shortDid(contact.did),
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: FontSizes.xs,
-                      color: o.textLow,
-                    ),
+                    style: monoStyle(fontSize: FontSizes.xs, color: o.textLow),
                   ),
                 ],
               ),
@@ -304,11 +300,7 @@ Future<String?> showContactPicker(BuildContext context, WidgetRef ref) {
                         const SizedBox(height: 2),
                         Text(
                           Fmt.shortDid(c.did),
-                          style: TextStyle(
-                            fontFamily: 'monospace',
-                            fontSize: FontSizes.xs,
-                            color: context.omnia.textLow,
-                          ),
+                          style: monoStyle(fontSize: FontSizes.xs, color: context.omnia.textLow),
                         ),
                       ],
                     ),

@@ -25,7 +25,7 @@ class TransactionScreen extends ConsumerWidget {
   void _copy(BuildContext context, String label, String value) {
     Haptics.selection();
     Clipboard.setData(ClipboardData(text: value));
-    showOmniaToast(context, message: '$label copied', icon: Iconsax.copy_success);
+    showOmniaToast(context, message: '$label copied', icon: Iconsax.copy_success_copy);
   }
 
   @override
@@ -257,11 +257,7 @@ class _Party extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     Fmt.shortDid(did),
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: FontSizes.sm,
-                      color: o.text,
-                    ),
+                    style: monoStyle(fontSize: FontSizes.sm, color: o.text),
                   ),
                 ],
               ),
@@ -314,11 +310,7 @@ class _Detail extends StatelessWidget {
                 value,
                 textAlign: TextAlign.right,
                 style: mono
-                    ? TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: FontSizes.sm,
-                        color: o.text,
-                      )
+                    ? monoStyle(fontSize: FontSizes.sm, color: o.text)
                     : theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: Weights.medium,
                         fontFeatures: kTabularFigures,

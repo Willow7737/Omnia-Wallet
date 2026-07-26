@@ -268,7 +268,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     const Spacer(),
                     OmniaButton(
                       label: isLast ? 'Get started' : 'Next',
-                      trailingIcon: isLast ? null : Iconsax.arrow_right_3,
+                      trailingIcon: isLast ? null : Iconsax.arrow_right_3_copy,
                       onPressed: _next,
                     ),
                   ],
@@ -385,7 +385,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             FadeIn(
               delay: const Duration(milliseconds: 180),
               child: MethodCard(
-                icon: Iconsax.import_1,
+                icon: Iconsax.import_1_copy,
                 title: 'Import from recovery phrase',
                 subtitle: 'Restore an existing wallet',
                 onTap: _import,
@@ -499,7 +499,7 @@ class MethodCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: Space.sm),
-            Icon(Iconsax.arrow_right_3, size: 16, color: sub),
+            Icon(Iconsax.arrow_right_3_copy, size: 16, color: sub),
           ],
         ),
       ),
@@ -661,11 +661,7 @@ class _WordChip extends StatelessWidget {
             child: Text(
               word,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: FontSizes.sm,
-                color: o.text,
-              ),
+              style: monoStyle(fontSize: FontSizes.sm, color: o.text),
             ),
           ),
         ],

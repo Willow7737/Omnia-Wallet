@@ -159,7 +159,7 @@ class _SheetChrome extends StatelessWidget {
                 ),
                 if (dismissible)
                   OmniaIconButton(
-                    icon: Iconsax.close_circle,
+                    icon: Iconsax.close_circle_copy,
                     size: 22,
                     color: o.textLow,
                     tooltip: 'Close',
@@ -598,7 +598,7 @@ class _InputBodyState extends State<_InputBody> {
                   ? Padding(
                       padding: const EdgeInsets.only(right: Space.xs),
                       child: OmniaIconButton(
-                        icon: _obscured ? Iconsax.eye_slash : Iconsax.eye,
+                        icon: _obscured ? Iconsax.eye_slash_copy : Iconsax.eye_copy,
                         size: 18,
                         color: o.textLow,
                         onTap: () => setState(() => _obscured = !_obscured),
@@ -642,7 +642,7 @@ void showOmniaToast(
   entry = OverlayEntry(
     builder: (overlayContext) => _Toast(
       message: message,
-      icon: icon ?? (error ? Iconsax.info_circle : Iconsax.tick_circle),
+      icon: icon ?? (error ? Iconsax.info_circle_copy : Iconsax.tick_circle),
       tint: error ? o.negative : o.positive,
       onDone: () {
         if (entry.mounted) entry.remove();

@@ -75,7 +75,7 @@ class _RequestViewState extends State<_RequestView> {
     showOmniaToast(
       context,
       message: _amount == null ? 'DID copied' : 'Payment request copied',
-      icon: Iconsax.copy_success,
+      icon: Iconsax.copy_success_copy,
     );
   }
 
@@ -169,7 +169,7 @@ class _RequestViewState extends State<_RequestView> {
                       ),
                     ),
                     const SizedBox(width: Space.sm),
-                    Icon(Iconsax.close_circle, size: 15, color: o.accent),
+                    Icon(Iconsax.close_circle_copy, size: 15, color: o.accent),
                   ],
                 ),
               ),
@@ -197,12 +197,7 @@ class _RequestViewState extends State<_RequestView> {
                   child: Text(
                     widget.identity.did,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'monospace',
-                      fontSize: FontSizes.sm,
-                      height: LineHeights.snug,
-                      color: o.textHigh,
-                    ),
+                    style: monoStyle(fontSize: FontSizes.sm, height: LineHeights.snug, color: o.textHigh),
                   ),
                 ),
                 const SizedBox(width: Space.sm),
@@ -226,7 +221,7 @@ class _RequestViewState extends State<_RequestView> {
             const SizedBox(width: Space.md),
             Expanded(
               child: OmniaButton(
-                label: amount == null ? 'Request amount' : 'Change amount',
+                label: amount == null ? 'Request' : 'Change',
                 icon: Iconsax.coin_copy,
                 expand: true,
                 color: ButtonColor.secondary,

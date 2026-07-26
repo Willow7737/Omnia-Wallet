@@ -121,7 +121,7 @@ class ProfileScreen extends ConsumerWidget {
                   showOmniaToast(
                     context,
                     message: 'DID copied',
-                    icon: Iconsax.copy_success,
+                    icon: Iconsax.copy_success_copy,
                   );
                 },
               ),
@@ -273,7 +273,7 @@ class _ProfileHeader extends StatelessWidget {
                             border: Border.all(color: o.bg, width: 2),
                           ),
                           child: const Icon(
-                            Iconsax.camera,
+                            Iconsax.camera_copy,
                             size: 13,
                             color: OmniaPalette.white,
                           ),

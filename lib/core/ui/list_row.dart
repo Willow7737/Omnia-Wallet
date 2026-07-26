@@ -55,7 +55,7 @@ class OmniaRow extends StatelessWidget {
     tail ??= trailingIcon != null
         ? Icon(trailingIcon, size: 18, color: o.textLow)
         : (chevron
-            ? Icon(Iconsax.arrow_right_3, size: 16, color: o.textLow)
+            ? Icon(Iconsax.arrow_right_3_copy, size: 16, color: o.textLow)
             : null);
 
     return Pressable(

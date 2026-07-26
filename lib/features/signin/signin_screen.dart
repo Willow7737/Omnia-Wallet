@@ -251,7 +251,7 @@ class _Unavailable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return OmniaEmptyState(
-      icon: Iconsax.slash,
+      icon: Iconsax.slash_copy,
       title: 'Sign-in unavailable',
       message: 'This build has no account backend configured. Create or '
           'import a self-custody wallet instead.',

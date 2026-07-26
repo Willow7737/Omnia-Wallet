@@ -82,7 +82,7 @@ class SettingsScreen extends ConsumerWidget {
           OmniaRow(
             title: 'Node status',
             subtitle: 'Version, peers, reachability',
-            icon: Iconsax.status_up,
+            icon: Iconsax.status_up_copy,
             chevron: true,
             onTap: () => context.push('/network'),
           ),
@@ -94,7 +94,7 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: isSupabase
                 ? 'Your DID and balance stay with your account'
                 : 'Recoverable only with your recovery phrase',
-            icon: isSupabase ? Iconsax.logout_copy : Iconsax.trash,
+            icon: isSupabase ? Iconsax.logout_copy : Iconsax.trash_copy,
             destructive: true,
             onTap: () => _wipe(context, ref, isSupabase: isSupabase),
           ),
@@ -193,7 +193,7 @@ class SettingsScreen extends ConsumerWidget {
   }) async {
     final confirmed = await showOmniaConfirm(
       context,
-      icon: isSupabase ? Iconsax.logout_copy : Iconsax.trash,
+      icon: isSupabase ? Iconsax.logout_copy : Iconsax.trash_copy,
       title: isSupabase ? 'Sign out?' : 'Remove wallet?',
       message: isSupabase
           ? 'This signs you out on this device. Your DID and balance stay '
@@ -449,11 +449,7 @@ class _Word extends StatelessWidget {
             child: Text(
               word,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'monospace',
-                fontSize: FontSizes.sm,
-                color: o.text,
-              ),
+              style: monoStyle(fontSize: FontSizes.sm, color: o.text),
             ),
           ),
         ],

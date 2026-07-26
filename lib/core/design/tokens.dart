@@ -374,3 +374,41 @@ extension OmniaThemeNameX on OmniaThemeName {
 /// With blur off the surfaces stay opaque rather than transparent, so nothing
 /// becomes unreadable — only the frosting is lost.
 bool kBlurEnabled = true;
+
+/// The typeface used for opaque identifiers — DIDs, transaction hashes,
+/// recovery words, node URLs.
+///
+/// Monospacing matters here: these are strings people compare character by
+/// character, and a proportional face makes `1`/`l` and `0`/`O` ambiguous
+/// exactly where it is most expensive to be wrong.
+///
+/// Flutter has no bundled monospace font, so `'monospace'` resolves to
+/// whatever the platform supplies — Roboto Mono on Android, but **Courier** on
+/// iOS, which is thin and mismatched against Inter. The fallback chain names
+/// the good faces first and ends at Inter, so a device that has none of them
+/// renders readable text rather than tofu boxes.
+const List<String> kMonoFallback = <String>[
+  'Menlo', // iOS / macOS
+  'Roboto Mono', // Android
+  'Consolas',
+  'DejaVu Sans Mono', // most Linux
+  'Inter', // last resort: proportional, but never blank
+];
+
+/// A monospaced style for identifiers. See [kMonoFallback].
+TextStyle monoStyle({
+  required double fontSize,
+  required Color color,
+  FontWeight fontWeight = Weights.normal,
+  double? height,
+}) =>
+    TextStyle(
+      fontFamily: 'monospace',
+      fontFamilyFallback: kMonoFallback,
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      height: height,
+      color: color,
+      // Hex reads better with the digits on a fixed advance.
+      fontFeatures: kTabularFigures,
+    );

@@ -61,12 +61,20 @@ Future<void> _loadFonts() async {
     await loader.load();
   }
 
-  await load('Inter', [
+  const inter = [
     'assets/fonts/Inter-Regular.ttf',
     'assets/fonts/Inter-Medium.ttf',
     'assets/fonts/Inter-SemiBold.ttf',
     'assets/fonts/Inter-Bold.ttf',
-  ]);
+  ];
+  await load('Inter', inter);
+
+  // The test engine ships no monospace face and maps any unknown family to its
+  // box-drawing placeholder, so `fontFamilyFallback` never gets consulted and
+  // every DID renders as a row of solid rectangles. Substituting Inter keeps
+  // the previews readable. On a device this is a real monospace font — see
+  // `kMonoFallback`.
+  await load('monospace', inter);
 
   // The icon font lives in the pub cache; resolve it through package_config
   // rather than hard-coding a version-stamped path.

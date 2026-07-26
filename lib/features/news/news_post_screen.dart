@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -185,7 +186,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
   Future<void> _deleteReply(NewsReply reply) async {
     final confirmed = await showOmniaConfirm(
       context,
-      icon: Iconsax.trash,
+      icon: Iconsax.trash_copy,
       title: 'Delete reply?',
       message: 'This removes your reply for everyone.',
       confirmLabel: 'Delete',
@@ -285,7 +286,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
 
     final confirmed = await showOmniaConfirm(
       context,
-      icon: Iconsax.slash,
+      icon: Iconsax.slash_copy,
       title: 'Block ${reply.authorName}?',
       message: "You won't see their posts or replies. You can unblock them "
           'later under Safety.',
@@ -314,7 +315,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
               SheetAction(
                 label: 'Delete reply',
                 value: 'delete',
-                icon: Iconsax.trash,
+                icon: Iconsax.trash_copy,
                 destructive: true,
               ),
             ]
@@ -327,7 +328,7 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
               SheetAction(
                 label: 'Block ${reply.authorName}',
                 value: 'block',
-                icon: Iconsax.slash,
+                icon: Iconsax.slash_copy,
                 destructive: true,
               ),
             ],
@@ -483,7 +484,7 @@ class _Composer extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(Space.xs, 0, 0, Space.sm),
               child: Row(
                 children: [
-                  Icon(Iconsax.arrow_bottom, size: 14, color: o.textLow),
+                  Icon(Iconsax.message_copy, size: 14, color: o.textLow),
                   const SizedBox(width: Space.xs + 2),
                   Expanded(
                     child: Text(
@@ -497,7 +498,7 @@ class _Composer extends StatelessWidget {
                     ),
                   ),
                   OmniaIconButton(
-                    icon: Iconsax.close_circle,
+                    icon: Iconsax.close_circle_copy,
                     size: 16,
                     box: 28,
                     color: o.textLow,
@@ -536,10 +537,16 @@ class _Composer extends StatelessWidget {
                           shape: BoxShape.circle,
                           border: Border.all(color: o.bg, width: 2),
                         ),
-                        child: Icon(
-                          Iconsax.close_circle,
-                          size: 13,
-                          color: o.bg,
+                        // Iconsax has no bare cross, and a circled one inside
+                        // this circle reads as a ring in a ring. A quarter-
+                        // turned plus is the glyph that belongs here.
+                        child: Transform.rotate(
+                          angle: math.pi / 4,
+                          child: Icon(
+                            Iconsax.add_copy,
+                            size: 13,
+                            color: o.bg,
+                          ),
                         ),
                       ),
                     ),

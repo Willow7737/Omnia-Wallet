@@ -38,7 +38,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Future<void> _clear() async {
     final confirmed = await showOmniaConfirm(
       context,
-      icon: Iconsax.trash,
+      icon: Iconsax.trash_copy,
       title: 'Clear notifications?',
       message: 'This removes every notification from this device.',
       confirmLabel: 'Clear all',
@@ -62,7 +62,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         actions: [
           if (notices.isNotEmpty)
             OmniaIconButton(
-              icon: Iconsax.trash,
+              icon: Iconsax.trash_copy,
               tooltip: 'Clear all',
               onTap: _clear,
             ),
@@ -112,7 +112,7 @@ class _NoticeTile extends StatelessWidget {
     return Container(
       // Unread rows carry a faint accent wash — the same cue Bluesky uses on
       // an unread notification, and quieter than a coloured dot on every row.
-      color: unread ? o.accent.withValues(alpha: 0.05) : null,
+      color: unread ? o.accent.withValues(alpha: 0.08) : null,
       padding: const EdgeInsets.symmetric(
         horizontal: Space.lg,
         vertical: Space.md + 2,

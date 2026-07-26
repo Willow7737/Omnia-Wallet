@@ -133,11 +133,7 @@ class _StatusHeader extends StatelessWidget {
                   nodeUrl,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: FontSizes.xs,
-                    color: o.textLow,
-                  ),
+                  style: monoStyle(fontSize: FontSizes.xs, color: o.textLow),
                 ),
               ],
             ),

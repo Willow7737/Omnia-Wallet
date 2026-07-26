@@ -28,7 +28,7 @@ class SafetyScreen extends ConsumerWidget {
           'never people.',
     ),
     (
-      icon: Iconsax.slash,
+      icon: Iconsax.slash_copy,
       title: 'No spam or scams',
       body: 'Don’t post unsolicited promotions, phishing links, '
           'giveaways, or attempts to steal keys, funds, or recovery phrases.',

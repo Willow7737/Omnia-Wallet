@@ -252,6 +252,40 @@ void main() {
       }
     });
   });
+
+  group('layout regressions', () {
+    testWidgets('the governance tally bar has height', (tester) async {
+      // A childless ColoredBox sizes to `constraints.smallest`, so under a
+      // centre-aligned Row every segment silently collapsed to zero and the
+      // bar disappeared. Nothing throws when that happens — only a render-box
+      // measurement catches it.
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: overrides(),
+          child: MaterialApp(
+            theme: OmniaTheme.light(),
+            home: const GovernanceScreen(),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 700));
+
+      final segments = find.descendant(
+        of: find.byType(GovernanceScreen),
+        matching: find.byType(ColoredBox),
+      );
+      expect(segments, findsWidgets, reason: 'tally bar drew no segments');
+
+      for (var i = 0; i < tester.widgetList(segments).length; i++) {
+        final size = tester.getSize(segments.at(i));
+        expect(size.height, greaterThan(0),
+            reason: 'tally segment $i collapsed to zero height');
+        expect(size.width, greaterThan(0),
+            reason: 'tally segment $i collapsed to zero width');
+      }
+    });
+  });
 }
 
 /// Secure storage is a platform channel, which does not exist under
