@@ -79,9 +79,15 @@ final balanceProvider = FutureProvider<Balance>((ref) async {
   return ref.watch(walletRepositoryProvider).balance();
 });
 
-/// Transaction history.
+/// Transaction history, **newest first**.
+///
+/// The node makes no ordering guarantee, so the order is established here
+/// rather than by each screen guessing at it. Both screens previously called
+/// `.reversed` on whatever arrived, which put the newest transfers at the
+/// bottom of Activity and kept them out of Home's "recent" list entirely.
 final historyProvider = FutureProvider<List<TransferRecord>>((ref) async {
-  return ref.watch(walletRepositoryProvider).history();
+  final records = await ref.watch(walletRepositoryProvider).history();
+  return [...records]..sort((a, b) => b.timestamp.compareTo(a.timestamp));
 });
 
 /// Public node status (health/version/peers). No auth required.

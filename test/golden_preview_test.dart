@@ -23,6 +23,7 @@ import 'package:omnia_wallet/features/history/transaction_screen.dart';
 import 'package:omnia_wallet/features/home/home_screen.dart';
 import 'package:omnia_wallet/features/moderation/safety_screen.dart';
 import 'package:omnia_wallet/features/network/network_screen.dart';
+import 'package:omnia_wallet/features/news/news_post_screen.dart';
 import 'package:omnia_wallet/features/news/news_screen.dart';
 import 'package:omnia_wallet/features/notifications/notifications_screen.dart';
 import 'package:omnia_wallet/features/profile/profile_screen.dart';
@@ -195,6 +196,61 @@ void main() {
     ),
   ];
 
+  NewsReply reply({
+    required String id,
+    required String author,
+    required String body,
+    required Duration ago,
+    String? parentId,
+  }) =>
+      NewsReply(
+        id: id,
+        postId: 'post-1',
+        authorName: author,
+        authorDid: 'did:omnia:${id.hashCode.toRadixString(16)}',
+        body: body,
+        createdAt: DateTime.now().subtract(ago),
+        parentId: parentId,
+      );
+
+  // A parent with a run long enough to collapse, so the "Show replies"
+  // affordance renders too.
+  final replies = [
+    reply(
+      id: 'r1',
+      author: 'ama',
+      body: 'Does Lane 0 finality mean the transfer can never be reversed?',
+      ago: const Duration(hours: 4),
+    ),
+    reply(
+      id: 'r2',
+      author: 'omnia',
+      body: 'Right — once Lane 0 signs off it is settled.',
+      ago: const Duration(hours: 3),
+      parentId: 'r1',
+    ),
+    reply(
+      id: 'r3',
+      author: 'kofi',
+      body: 'Good to know, thanks.',
+      ago: const Duration(hours: 2),
+      parentId: 'r1',
+    ),
+    reply(
+      id: 'r4',
+      author: 'node ops',
+      body: 'We see it land in about 400ms on the test network.',
+      ago: const Duration(hours: 1),
+      parentId: 'r1',
+    ),
+    reply(
+      id: 'r5',
+      author: 'sena',
+      body: 'The bolt on the transaction row is a nice touch.',
+      ago: const Duration(minutes: 20),
+    ),
+  ];
+
   final proposals = [
     Proposal(
       id: 'prop-1',
@@ -232,6 +288,7 @@ void main() {
         displayNameProvider.overrideWith((ref) async => 'Ama'),
         newsPostsProvider.overrideWith((ref) async => posts),
         proposalsProvider.overrideWith((ref) async => proposals),
+        newsRepliesProvider('post-1').overrideWith((ref) async => replies),
       ];
 
   final screens = <String, Widget>{
@@ -248,6 +305,7 @@ void main() {
     'network': const NetworkScreen(),
     'safety': const SafetyScreen(),
     'about': const AboutScreen(),
+    'post': NewsPostScreen(post: posts.first),
     'transaction': TransactionScreen(
       record: tx(
         from: did,

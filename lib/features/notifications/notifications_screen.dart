@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 
 import '../../core/format.dart';
@@ -8,6 +9,7 @@ import '../../core/ui/avatar.dart';
 import '../../core/ui/button.dart';
 import '../../core/ui/header.dart';
 import '../../core/ui/list_row.dart';
+import '../../core/ui/press.dart';
 import '../../core/ui/sheet.dart';
 import '../../core/ui/states.dart';
 import '../../state/notices.dart';
@@ -87,7 +89,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 }
 
-class _NoticeTile extends StatelessWidget {
+class _NoticeTile extends ConsumerWidget {
   const _NoticeTile({required this.notice});
 
   final AppNotice notice;
@@ -103,62 +105,78 @@ class _NoticeTile extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final o = context.omnia;
     final theme = Theme.of(context);
     final (icon, tint) = _style(context);
     final unread = !notice.read;
 
-    return Container(
-      // Unread rows carry a faint accent wash — the same cue Bluesky uses on
-      // an unread notification, and quieter than a coloured dot on every row.
-      color: unread ? o.accent.withValues(alpha: 0.08) : null,
-      padding: const EdgeInsets.symmetric(
-        horizontal: Space.lg,
-        vertical: Space.md + 2,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IconAvatar(icon: icon, tint: tint),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        notice.title,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          fontSize: FontSizes.md,
-                          fontWeight: unread ? Weights.bold : Weights.medium,
-                          height: LineHeights.snug,
+    return Pressable(
+      onTap: () {
+        // Opening a notification is also the moment it stops being news, so
+        // clear the badge before navigating rather than waiting for the
+        // screen's own mark-all timer.
+        ref.read(noticesProvider.notifier).markAllRead();
+        final destination = notice.destination;
+        // Tab roots switch tabs; everything else stacks on top.
+        const tabs = {'/', '/activity', '/news', '/notifications', '/profile'};
+        if (tabs.contains(destination)) {
+          context.go(destination);
+        } else {
+          context.push(destination);
+        }
+      },
+      child: Container(
+        // Unread rows carry a faint accent wash — the same cue Bluesky uses on
+        // an unread notification, and quieter than a coloured dot on every row.
+        color: unread ? o.accent.withValues(alpha: 0.08) : null,
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.lg,
+          vertical: Space.md + 2,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            IconAvatar(icon: icon, tint: tint),
+            const SizedBox(width: Space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          notice.title,
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            fontSize: FontSizes.md,
+                            fontWeight: unread ? Weights.bold : Weights.medium,
+                            height: LineHeights.snug,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: Space.sm),
-                    Text(
-                      Fmt.relative(notice.dateTime),
-                      style: theme.textTheme.labelSmall
-                          ?.copyWith(color: o.textLow),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  notice.body,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: o.textMedium,
-                    height: LineHeights.snug,
+                      const SizedBox(width: Space.sm),
+                      Text(
+                        Fmt.relative(notice.dateTime),
+                        style: theme.textTheme.labelSmall
+                            ?.copyWith(color: o.textLow),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    notice.body,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: o.textMedium,
+                      height: LineHeights.snug,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
