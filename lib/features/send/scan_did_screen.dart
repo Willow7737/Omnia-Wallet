@@ -120,9 +120,7 @@ class _ScanDidScreenState extends State<ScanDidScreen> {
                     OmniaIconButton(
                       icon: _torchOn ? Iconsax.flash_1 : Iconsax.flash_slash,
                       size: 22,
-                      color: _torchOn
-                          ? OmniaPalette.black
-                          : OmniaPalette.white,
+                      color: _torchOn ? OmniaPalette.black : OmniaPalette.white,
                       background: _torchOn
                           ? OmniaPalette.white
                           : OmniaPalette.black.withValues(alpha: 0.4),

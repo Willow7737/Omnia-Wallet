@@ -90,7 +90,6 @@ class SafetyScreen extends ConsumerWidget {
             ),
           ),
           const Hairline(),
-
           OmniaSectionLabel(
             'Blocked accounts',
             action: blocked.isEmpty

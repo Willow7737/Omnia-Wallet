@@ -134,8 +134,7 @@ class _NoticeTile extends StatelessWidget {
                         notice.title,
                         style: theme.textTheme.bodyLarge?.copyWith(
                           fontSize: FontSizes.md,
-                          fontWeight:
-                              unread ? Weights.bold : Weights.medium,
+                          fontWeight: unread ? Weights.bold : Weights.medium,
                           height: LineHeights.snug,
                         ),
                       ),
@@ -143,8 +142,8 @@ class _NoticeTile extends StatelessWidget {
                     const SizedBox(width: Space.sm),
                     Text(
                       Fmt.relative(notice.dateTime),
-                      style:
-                          theme.textTheme.labelSmall?.copyWith(color: o.textLow),
+                      style: theme.textTheme.labelSmall
+                          ?.copyWith(color: o.textLow),
                     ),
                   ],
                 ),

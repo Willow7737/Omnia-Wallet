@@ -111,7 +111,9 @@ class OmniaButton extends StatelessWidget {
     if (!_enabled) {
       return switch (variant) {
         ButtonVariant.solid => (
-            bg: color == ButtonColor.negative ? p.negative700 : o.accentDisabled,
+            bg: color == ButtonColor.negative
+                ? p.negative700
+                : o.accentDisabled,
             fg: o.textInverted,
             border: null,
           ),

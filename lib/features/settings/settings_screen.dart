@@ -246,7 +246,8 @@ class _ThemePicker extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(themeProvider);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.lg, Space.xs, Space.lg, Space.xl),
+      padding:
+          const EdgeInsets.fromLTRB(Space.lg, Space.xs, Space.lg, Space.xl),
       child: Row(
         children: [
           for (final name in OmniaThemeName.values) ...[
@@ -438,7 +439,8 @@ class _Word extends StatelessWidget {
   Widget build(BuildContext context) {
     final o = context.omnia;
     return Container(
-      width: (MediaQuery.sizeOf(context).width - Space.xl * 2 - Space.sm * 2) / 3,
+      width:
+          (MediaQuery.sizeOf(context).width - Space.xl * 2 - Space.sm * 2) / 3,
       padding: const EdgeInsets.symmetric(
         horizontal: Space.md,
         vertical: Space.sm + 2,

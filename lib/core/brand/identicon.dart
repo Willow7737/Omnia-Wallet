@@ -58,8 +58,8 @@ class _IdenticonPainter extends CustomPainter {
     final hue = ((bytes[0] << 8 | bytes[1]) % 360).toDouble();
     final light = isDark ? 0.62 : 0.48;
     final from = HSLColor.fromAHSL(1, hue, 0.62, light).toColor();
-    final to = HSLColor.fromAHSL(1, (hue + 42) % 360, 0.62, light - 0.08)
-        .toColor();
+    final to =
+        HSLColor.fromAHSL(1, (hue + 42) % 360, 0.62, light - 0.08).toColor();
 
     final rect = Offset.zero & size;
     canvas.clipRRect(
@@ -92,7 +92,5 @@ class _IdenticonPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_IdenticonPainter old) =>
-      old.seed != seed ||
-      old.background != background ||
-      old.isDark != isDark;
+      old.seed != seed || old.background != background || old.isDark != isDark;
 }

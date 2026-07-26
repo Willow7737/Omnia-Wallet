@@ -75,7 +75,6 @@ class ProfileScreen extends ConsumerWidget {
                 onEditPhoto: () => _changePhoto(context, ref),
               ),
               const Hairline(),
-
               OmniaRow(
                 title: 'What is Omnia?',
                 subtitle: 'A plain-language guide to the app and UBC',
@@ -116,7 +115,6 @@ class ProfileScreen extends ConsumerWidget {
                 onTap: () => context.push('/safety'),
               ),
               const Hairline(),
-
               const OmniaSectionLabel('Identity'),
               OmniaRow(
                 title: 'Your DID',
@@ -142,7 +140,6 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ],
               const Hairline(),
-
               const OmniaSectionLabel('Advanced'),
               OmniaRow(
                 title: 'Network',

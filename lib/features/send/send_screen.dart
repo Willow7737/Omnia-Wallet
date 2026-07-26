@@ -140,8 +140,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   }
 
   String _authorizationNote() {
-    final mode =
-        ref.read(authModeProvider).valueOrNull ?? AuthMode.selfCustody;
+    final mode = ref.read(authModeProvider).valueOrNull ?? AuthMode.selfCustody;
     return mode == AuthMode.supabase
         ? 'Authorized through your Omnia account'
         : 'Signed on-device with your private key';

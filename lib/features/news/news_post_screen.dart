@@ -391,8 +391,8 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
                     error: (e, _) => OmniaErrorState(
                       message: friendlyError(e).message,
                       compact: true,
-                      onRetry: () => ref
-                          .invalidate(newsRepliesProvider(widget.post.id)),
+                      onRetry: () =>
+                          ref.invalidate(newsRepliesProvider(widget.post.id)),
                     ),
                     data: (replies) => _ThreadedReplies(
                       replies: replies,
@@ -583,8 +583,10 @@ class _Composer extends StatelessWidget {
                     textCapitalization: TextCapitalization.sentences,
                     // The counter would push the composer taller on every
                     // keystroke; the limit still applies.
-                    buildCounter: (_, {required currentLength,
-                            required isFocused, maxLength}) =>
+                    buildCounter: (_,
+                            {required currentLength,
+                            required isFocused,
+                            maxLength}) =>
                         null,
                     style: TextStyle(
                       fontFamily: 'Inter',

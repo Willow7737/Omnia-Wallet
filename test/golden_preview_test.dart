@@ -145,10 +145,19 @@ void main() {
       );
 
   List<TransferRecord> history() => [
-        tx(from: did, to: otherDid, amount: 39, ago: const Duration(hours: 2),
-            signed: true, finalized: true),
+        tx(
+            from: did,
+            to: otherDid,
+            amount: 39,
+            ago: const Duration(hours: 2),
+            signed: true,
+            finalized: true),
         tx(from: otherDid, to: did, amount: 97, ago: const Duration(hours: 6)),
-        tx(from: did, to: otherDid, amount: 32, ago: const Duration(days: 1),
+        tx(
+            from: did,
+            to: otherDid,
+            amount: 32,
+            ago: const Duration(days: 1),
             signed: true),
         tx(from: otherDid, to: did, amount: 46, ago: const Duration(days: 2)),
       ].reversed.toList();

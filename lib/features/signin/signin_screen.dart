@@ -164,7 +164,6 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 ),
               ),
               const SizedBox(height: Space.xxl),
-
               if (!available)
                 _Unavailable()
               else if (_busy)

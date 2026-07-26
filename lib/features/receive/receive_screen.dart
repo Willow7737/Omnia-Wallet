@@ -111,7 +111,8 @@ class _RequestViewState extends State<_RequestView> {
     final amount = _amount;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(Space.xl, Space.xl, Space.xl, Space.x4l),
+      padding:
+          const EdgeInsets.fromLTRB(Space.xl, Space.xl, Space.xl, Space.x4l),
       children: [
         // A QR code needs a light quiet zone to scan reliably, so this panel
         // stays white in every theme — it is a scanning target, not a surface.
@@ -197,7 +198,10 @@ class _RequestViewState extends State<_RequestView> {
                   child: Text(
                     widget.identity.did,
                     textAlign: TextAlign.center,
-                    style: monoStyle(fontSize: FontSizes.sm, height: LineHeights.snug, color: o.textHigh),
+                    style: monoStyle(
+                        fontSize: FontSizes.sm,
+                        height: LineHeights.snug,
+                        color: o.textHigh),
                   ),
                 ),
                 const SizedBox(width: Space.sm),

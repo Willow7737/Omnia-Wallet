@@ -25,7 +25,8 @@ class TransactionScreen extends ConsumerWidget {
   void _copy(BuildContext context, String label, String value) {
     Haptics.selection();
     Clipboard.setData(ClipboardData(text: value));
-    showOmniaToast(context, message: '$label copied', icon: Iconsax.copy_success_copy);
+    showOmniaToast(context,
+        message: '$label copied', icon: Iconsax.copy_success_copy);
   }
 
   @override
@@ -86,7 +87,8 @@ class TransactionScreen extends ConsumerWidget {
                   const SizedBox(height: Space.xs),
                   Text(
                     Fmt.dateTime(record.dateTime),
-                    style: theme.textTheme.bodySmall?.copyWith(color: o.textLow),
+                    style:
+                        theme.textTheme.bodySmall?.copyWith(color: o.textLow),
                   ),
                   const SizedBox(height: Space.lg),
                   Wrap(
@@ -95,9 +97,8 @@ class TransactionScreen extends ConsumerWidget {
                     runSpacing: Space.sm,
                     children: [
                       OmniaPill(
-                        label: record.status.isEmpty
-                            ? 'recorded'
-                            : record.status,
+                        label:
+                            record.status.isEmpty ? 'recorded' : record.status,
                         icon: ok ? Iconsax.tick_circle : Iconsax.clock_copy,
                         color: ok ? o.positive : o.warning,
                       ),

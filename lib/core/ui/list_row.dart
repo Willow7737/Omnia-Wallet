@@ -74,7 +74,9 @@ class OmniaRow extends StatelessWidget {
               leading!,
               const SizedBox(width: Space.md + 2),
             ] else if (icon != null) ...[
-              Icon(icon, size: 21, color: iconColor ?? (destructive ? tint : o.textMedium)),
+              Icon(icon,
+                  size: 21,
+                  color: iconColor ?? (destructive ? tint : o.textMedium)),
               const SizedBox(width: Space.md + 2),
             ],
             Expanded(

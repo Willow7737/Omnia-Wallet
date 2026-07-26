@@ -204,7 +204,8 @@ class _ProposalState extends ConsumerState<_Proposal> {
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               _Tally(label: 'For', value: p.votesFor, color: o.positive),
-              _Tally(label: 'Against', value: p.votesAgainst, color: o.negative),
+              _Tally(
+                  label: 'Against', value: p.votesAgainst, color: o.negative),
               _Tally(
                 label: 'Abstain',
                 value: p.votesAbstain,

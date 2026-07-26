@@ -29,8 +29,7 @@ class ThemeController extends StateNotifier<OmniaThemeName> {
   }
 }
 
-final themeProvider =
-    StateNotifierProvider<ThemeController, OmniaThemeName>(
+final themeProvider = StateNotifierProvider<ThemeController, OmniaThemeName>(
   ThemeController.new,
 );
 

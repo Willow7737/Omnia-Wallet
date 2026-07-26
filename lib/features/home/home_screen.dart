@@ -67,7 +67,8 @@ class HomeScreen extends ConsumerWidget {
                   Space.lg,
                   0,
                 ),
-                child: _OfflineBanner(error: friendlyError(balanceAsync.error!)),
+                child:
+                    _OfflineBanner(error: friendlyError(balanceAsync.error!)),
               ),
             FadeIn(child: _Balance(balanceAsync: balanceAsync)),
             const FadeIn(
@@ -112,7 +113,8 @@ class _Balance extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.lg, Space.xxl, Space.lg, Space.xl),
+      padding:
+          const EdgeInsets.fromLTRB(Space.lg, Space.xxl, Space.lg, Space.xl),
       child: balanceAsync.when(
         loading: () => const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,7 +464,9 @@ class TransferTile extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             IconAvatar(
-              icon: mine ? Iconsax.arrow_up_3_copy : Iconsax.arrow_swap_horizontal_copy,
+              icon: mine
+                  ? Iconsax.arrow_up_3_copy
+                  : Iconsax.arrow_swap_horizontal_copy,
               tint: tint,
             ),
             const SizedBox(width: Space.md),
@@ -471,9 +475,7 @@ class TransferTile extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    mine
-                        ? 'You sent'
-                        : '${Fmt.shortDid(record.fromDid)} sent',
+                    mine ? 'You sent' : '${Fmt.shortDid(record.fromDid)} sent',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodyLarge?.copyWith(
@@ -510,7 +512,9 @@ class TransferTile extends ConsumerWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  mine ? '−${Fmt.number(record.amount)}' : Fmt.number(record.amount),
+                  mine
+                      ? '−${Fmt.number(record.amount)}'
+                      : Fmt.number(record.amount),
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: FontSizes.md,

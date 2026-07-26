@@ -89,8 +89,7 @@ class OmniaColors extends ThemeExtension<OmniaColors> {
   Color get scrim => OmniaPalette.black.withValues(alpha: isDark ? 0.6 : 0.35);
 
   /// Shadow tint. ALF uses 0.1 opacity in light, 0.4 in dark.
-  Color get shadow =>
-      OmniaPalette.black.withValues(alpha: isDark ? 0.4 : 0.1);
+  Color get shadow => OmniaPalette.black.withValues(alpha: isDark ? 0.4 : 0.1);
 
   /// ALF `shadow_md`, translated to Flutter.
   List<BoxShadow> get shadowMd => [
@@ -335,8 +334,7 @@ class OmniaTheme {
         floatingLabelStyle:
             TextStyle(color: omnia.link, fontSize: FontSizes.sm),
         helperStyle: TextStyle(color: omnia.textLow, fontSize: FontSizes.sm),
-        errorStyle:
-            TextStyle(color: omnia.negative, fontSize: FontSizes.sm),
+        errorStyle: TextStyle(color: omnia.negative, fontSize: FontSizes.sm),
         border: OutlineInputBorder(
           borderRadius: Radii.rMd,
           borderSide: BorderSide(color: omnia.borderMedium),
@@ -397,9 +395,7 @@ class OmniaTheme {
                 ? OmniaPalette.white
                 : omnia.bg),
         trackColor: WidgetStateProperty.resolveWith((states) =>
-            states.contains(WidgetState.selected)
-                ? omnia.accent
-                : omnia.bg100),
+            states.contains(WidgetState.selected) ? omnia.accent : omnia.bg100),
         trackOutlineColor: WidgetStateProperty.resolveWith((states) =>
             states.contains(WidgetState.selected)
                 ? Colors.transparent
@@ -479,8 +475,8 @@ class OmniaTheme {
           height: LineHeights.tight, features: kTabularFigures),
 
       // Screen and section headings.
-      headlineLarge: style(FontSizes.xxxl, Weights.bold,
-          height: LineHeights.tight),
+      headlineLarge:
+          style(FontSizes.xxxl, Weights.bold, height: LineHeights.tight),
       headlineMedium:
           style(FontSizes.xxl, Weights.bold, height: LineHeights.tight),
       headlineSmall:
@@ -492,8 +488,8 @@ class OmniaTheme {
       titleSmall: style(FontSizes.sm, Weights.semiBold),
 
       // Prose.
-      bodyLarge: style(FontSizes.lg, Weights.normal,
-          height: LineHeights.relaxed),
+      bodyLarge:
+          style(FontSizes.lg, Weights.normal, height: LineHeights.relaxed),
       bodyMedium:
           style(FontSizes.md, Weights.normal, height: LineHeights.relaxed),
       bodySmall: style(FontSizes.sm, Weights.normal,

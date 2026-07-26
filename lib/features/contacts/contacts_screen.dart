@@ -219,9 +219,8 @@ Future<void> editContact(
     subtitle: 'Paste the DID you want to save.',
     hintText: 'did:omnia:…',
     confirmLabel: 'Next',
-    validator: (v) => v.startsWith('did:omnia:')
-        ? null
-        : 'A DID must start with did:omnia:',
+    validator: (v) =>
+        v.startsWith('did:omnia:') ? null : 'A DID must start with did:omnia:',
   );
   if (did == null || did.isEmpty || !context.mounted) return;
 
@@ -261,9 +260,8 @@ Future<String?> showContactPicker(BuildContext context, WidgetRef ref) {
       return ListView.separated(
         primary: contacts.length > 6,
         shrinkWrap: contacts.length <= 6,
-        physics: contacts.length <= 6
-            ? const NeverScrollableScrollPhysics()
-            : null,
+        physics:
+            contacts.length <= 6 ? const NeverScrollableScrollPhysics() : null,
         padding: EdgeInsets.only(
           top: Space.sm,
           bottom: Space.xl + MediaQuery.viewPaddingOf(sheetContext).bottom,
@@ -300,7 +298,9 @@ Future<String?> showContactPicker(BuildContext context, WidgetRef ref) {
                         const SizedBox(height: 2),
                         Text(
                           Fmt.shortDid(c.did),
-                          style: monoStyle(fontSize: FontSizes.xs, color: context.omnia.textLow),
+                          style: monoStyle(
+                              fontSize: FontSizes.xs,
+                              color: context.omnia.textLow),
                         ),
                       ],
                     ),

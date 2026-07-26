@@ -461,9 +461,8 @@ class MethodCard extends StatelessWidget {
     final o = context.omnia;
     final theme = Theme.of(context);
     final fg = primary ? OmniaPalette.white : o.text;
-    final sub = primary
-        ? OmniaPalette.white.withValues(alpha: 0.82)
-        : o.textLow;
+    final sub =
+        primary ? OmniaPalette.white.withValues(alpha: 0.82) : o.textLow;
 
     return Pressable(
       onTap: onTap,

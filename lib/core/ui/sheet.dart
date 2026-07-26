@@ -454,8 +454,8 @@ class _MenuRow<T> extends StatelessWidget {
                   if (action.subtitle != null)
                     Text(
                       action.subtitle!,
-                      style: theme.textTheme.bodySmall
-                          ?.copyWith(color: o.textLow),
+                      style:
+                          theme.textTheme.bodySmall?.copyWith(color: o.textLow),
                     ),
                 ],
               ),
@@ -598,7 +598,9 @@ class _InputBodyState extends State<_InputBody> {
                   ? Padding(
                       padding: const EdgeInsets.only(right: Space.xs),
                       child: OmniaIconButton(
-                        icon: _obscured ? Iconsax.eye_slash_copy : Iconsax.eye_copy,
+                        icon: _obscured
+                            ? Iconsax.eye_slash_copy
+                            : Iconsax.eye_copy,
                         size: 18,
                         color: o.textLow,
                         onTap: () => setState(() => _obscured = !_obscured),

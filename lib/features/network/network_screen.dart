@@ -99,8 +99,7 @@ class _StatusHeader extends StatelessWidget {
 
     final loading = infoAsync.isLoading;
     final reachable = infoAsync.hasValue;
-    final color =
-        loading ? o.textLow : (reachable ? o.positive : o.negative);
+    final color = loading ? o.textLow : (reachable ? o.positive : o.negative);
     final label =
         loading ? 'Checking…' : (reachable ? 'Reachable' : 'Unreachable');
 

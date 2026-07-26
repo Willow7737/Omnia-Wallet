@@ -106,8 +106,7 @@ class OmniaHeader extends StatelessWidget implements PreferredSizeWidget {
           if (lead != null) const SizedBox(width: Space.xs),
           Expanded(
             child: Align(
-              alignment:
-                  centerTitle ? Alignment.center : Alignment.centerLeft,
+              alignment: centerTitle ? Alignment.center : Alignment.centerLeft,
               child: titleContent,
             ),
           ),
@@ -178,8 +177,8 @@ class OmniaSliverHeader extends StatelessWidget {
       pinned: true,
       delegate: _HeaderDelegate(
         header: header,
-        height: header.preferredSize.height +
-            MediaQuery.viewPaddingOf(context).top,
+        height:
+            header.preferredSize.height + MediaQuery.viewPaddingOf(context).top,
       ),
     );
   }
