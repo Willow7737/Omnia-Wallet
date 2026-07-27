@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/theme.dart';
 import '../../data/news.dart';
@@ -51,16 +52,18 @@ class PostShareCard {
     const light = OmniaColors(palette: OmniaPalette.defaults, isDark: false);
     final c = palette ?? light;
 
+    final mark = await _loadMark(c);
     final recorder = ui.PictureRecorder();
     // Height is not known until the text is laid out, so measure first with a
     // throwaway canvas-free pass, then paint for real.
-    final height = _paint(null, post, link, image, c);
+    final height = _paint(null, post, link, image, mark, c);
     final canvas = ui.Canvas(
       recorder,
       ui.Rect.fromLTWH(0, 0, width * scale, height * scale),
     );
     canvas.scale(scale);
-    _paint(canvas, post, link, image, c);
+    _paint(canvas, post, link, image, mark, c);
+    mark?.picture.dispose();
 
     final picture = recorder.endRecording();
     final rendered = await picture.toImage(
@@ -85,11 +88,33 @@ class PostShareCard {
   /// Measure and paint share one body so the two can never disagree — the
   /// classic failure of this kind of code is a card whose text runs off the
   /// bottom because the measuring pass forgot a gap.
+  /// The real Omnia mark, as a vector picture.
+  ///
+  /// The asset paints in `currentColor`, so the tint is supplied here the same
+  /// way `BrandMark` supplies it on screen — otherwise it comes out as a
+  /// black-on-black void. Returns null if the asset cannot be loaded, in which
+  /// case the avatar falls back to a plain tinted disc; a share should not
+  /// fail over a logo.
+  static Future<PictureInfo?> _loadMark(OmniaColors c) async {
+    try {
+      return await vg.loadPicture(
+        SvgAssetLoader(
+          'assets/logo/omnia_mark.svg',
+          theme: SvgTheme(currentColor: c.text),
+        ),
+        null,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   static double _paint(
     ui.Canvas? canvas,
     NewsPost post,
     String link,
     ui.Image? image,
+    PictureInfo? mark,
     OmniaColors c,
   ) {
     const contentWidth = width - _pad * 2;
@@ -118,18 +143,22 @@ class PostShareCard {
             ..style = ui.PaintingStyle.stroke
             ..strokeWidth = 1,
         );
-      // The brand mark, drawn as the ring-and-dot rather than pulled from an
-      // asset — an asset would make this function need a BuildContext.
-      canvas
-        ..drawCircle(
-          centre,
-          _avatar / 4.4,
-          ui.Paint()
-            ..color = c.accent
-            ..style = ui.PaintingStyle.stroke
-            ..strokeWidth = 2.4,
-        )
-        ..drawCircle(centre, 2.6, ui.Paint()..color = c.accent);
+      // The actual Omnia mark, at the same proportion to its disc that the
+      // feed uses (half the avatar). A hand-drawn approximation here read as
+      // a stray "O" and did not look like the app at all.
+      if (mark != null) {
+        const glyph = _avatar / 2;
+        final factor = glyph / mark.size.longestSide;
+        canvas
+          ..save()
+          ..translate(
+            centre.dx - mark.size.width * factor / 2,
+            centre.dy - mark.size.height * factor / 2,
+          )
+          ..scale(factor)
+          ..drawPicture(mark.picture)
+          ..restore();
+      }
     }
 
     final author = _text(

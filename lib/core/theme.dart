@@ -82,8 +82,12 @@ class OmniaColors extends ThemeExtension<OmniaColors> {
   Color get success => positive;
   Color get warning => palette.yellow;
 
-  /// The heart / like colour.
-  Color get like => palette.pink;
+  /// The heart.
+  ///
+  /// A true red, not the magenta ALF uses. Every platform people already use
+  /// paints a liked heart red — a pink one reads as a different gesture, and
+  /// the whole point of the heart is that it needs no explaining.
+  Color get like => palette.red;
 
   /// Scrim behind modals and sheets.
   Color get scrim => OmniaPalette.black.withValues(alpha: isDark ? 0.6 : 0.35);
@@ -122,6 +126,7 @@ class OmniaColors extends ThemeExtension<OmniaColors> {
         positive: ramp(palette.positive, other.palette.positive),
         negative: ramp(palette.negative, other.palette.negative),
         pink: Color.lerp(palette.pink, other.palette.pink, t)!,
+        red: Color.lerp(palette.red, other.palette.red, t)!,
         yellow: Color.lerp(palette.yellow, other.palette.yellow, t)!,
       ),
     );

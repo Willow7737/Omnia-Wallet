@@ -23,11 +23,13 @@ import '../../core/ui/scroll_to_top.dart';
 import '../../core/ui/sheet.dart';
 import '../../core/ui/states.dart';
 import '../../core/ui/thread.dart';
+import '../../data/link_preview.dart';
 import '../../data/news.dart';
 import '../../data/reactions.dart';
 import '../../state/news.dart';
 import '../../state/reactions.dart';
 import '../shell/app_shell.dart';
+import 'link_card.dart';
 import 'media_viewer.dart';
 import 'reaction_loader.dart';
 import 'share_card.dart';
@@ -217,19 +219,19 @@ class NewsPostCard extends ConsumerWidget {
     }
   }
 
-  Future<void> _react(BuildContext context, WidgetRef ref) async {
-    Haptics.selection();
-    try {
-      await ref.read(reactionsProvider.notifier).toggle(
-            contentType: ReactionKey.post,
-            contentId: post.id,
-            direction: 1,
-          );
-    } catch (_) {
-      if (context.mounted) {
-        showOmniaToast(context, message: 'Sign in to react', error: true);
-      }
+  void _react(BuildContext context, WidgetRef ref) {
+    final reactions = ref.read(reactionsProvider.notifier);
+    if (!reactions.canReact) {
+      showOmniaToast(context, message: 'Sign in to react', error: true);
+      return;
     }
+    Haptics.selection();
+    // Not awaited — see ReactionsNotifier.toggle.
+    reactions.toggle(
+      contentType: ReactionKey.post,
+      contentId: post.id,
+      direction: 1,
+    );
   }
 
   @override
@@ -303,6 +305,13 @@ class NewsPostCard extends ConsumerWidget {
                 heroTag: 'post-media-${post.id}',
                 caption: post.title,
               ),
+            ]
+            // A post's own picture and a link card would compete; when the
+            // post has an image of its own, that is the picture.
+            else if (LinkPreviewService.firstUrl(post.body)
+                case final link?) ...[
+              const SizedBox(height: Space.md),
+              LinkPreviewCard(url: link),
             ],
 
             if (post.tags.isNotEmpty) ...[

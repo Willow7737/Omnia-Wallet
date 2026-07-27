@@ -84,6 +84,42 @@ void main() {
         expect(row.ancestorRails, isEmpty);
       }
     });
+
+    test("a reply never carries a rail on to the next top-level comment", () {
+      // The reported bug, exactly: a has an answer, and another comment
+      // follows a. The answer used to be given a level-0 rail — because a
+      // "had a later sibling" — which drew a line from a, past its own
+      // answer, straight into an unrelated comment.
+      final layout = buildThreadLayout([
+        r('a'),
+        r('answer', parent: 'a'),
+        r('unrelated'),
+      ]);
+
+      expect(
+          layout.rows.map((row) => row.reply.id), ['a', 'answer', 'unrelated']);
+      expect(
+        rowFor(layout, 'answer').ancestorRails,
+        [false],
+        reason: 'a rail ran from one top-level comment into the next',
+      );
+    });
+
+    test('a nested sibling still gets its passing rail', () {
+      // The fix must not cost the legitimate case: inside a thread, an
+      // ancestor with more answers to come does keep its rail.
+      final layout = buildThreadLayout([
+        r('root'),
+        r('a', parent: 'root'),
+        r('a1', parent: 'a'),
+        r('b', parent: 'root'),
+        r('other'),
+      ]);
+
+      // Level 0 is `root`, which must never continue; level 1 is `a`, which
+      // does — `b` is still to come.
+      expect(rowFor(layout, 'a1').ancestorRails, [false, true]);
+    });
   });
 
   group('collapsing', () {

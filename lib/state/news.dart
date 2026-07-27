@@ -21,6 +21,8 @@ final newsPostsProvider = FutureProvider<List<NewsPost>>((ref) async {
             type: NoticeType.news,
             title: 'News from the Omnia team',
             body: newest.title,
+            // So the notification opens this post, not the top of the feed.
+            subjectId: newest.id,
           );
     }
     await store.saveLastSeenNews(newest.id);

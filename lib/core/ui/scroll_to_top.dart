@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 
@@ -22,16 +24,26 @@ class ScrollToTop extends StatefulWidget {
   const ScrollToTop({
     super.key,
     required this.child,
-    this.threshold = 900,
+    this.screens = 1.0,
+    this.minOffset = 400,
     this.bottomInset = 0,
     this.alignment = Alignment.bottomCenter,
   });
 
   final Widget child;
 
-  /// How far down the button starts being offered, in pixels. 900 is roughly
-  /// a screen and a half — far enough that flicking back is genuinely tedious.
-  final double threshold;
+  /// How far down the button starts being offered, counted in screenfuls.
+  ///
+  /// Measured against the viewport rather than a fixed pixel count, because a
+  /// fixed one means "far" depends on how tall the rows happen to be. A feed
+  /// of tall posts passed 900px almost immediately while a log of short
+  /// transaction rows never reached it at all — same gesture, same amount of
+  /// reading, no button. One screenful is the point at which the top is off
+  /// screen and staying there.
+  final double screens;
+
+  /// Floor for the above, so a short viewport still requires real scrolling.
+  final double minOffset;
 
   /// Extra space to clear at the bottom (a tab bar, a composer).
   final double bottomInset;
@@ -49,10 +61,17 @@ class _ScrollToTopState extends State<ScrollToTop> {
   /// Where the reader was at the last update, to tell up from down.
   double _lastOffset = 0;
 
+  double _thresholdFor(ScrollMetrics metrics) => math.max(
+        widget.minOffset,
+        metrics.viewportDimension * widget.screens,
+      );
+
   bool _handle(ScrollNotification notification) {
     // Nested horizontal scrollers (a tag strip, a carousel) must not drive
     // this.
     if (notification.metrics.axis != Axis.vertical) return false;
+
+    final threshold = _thresholdFor(notification.metrics);
 
     if (notification is ScrollUpdateNotification) {
       final ctx = notification.context;
@@ -62,12 +81,12 @@ class _ScrollToTopState extends State<ScrollToTop> {
       final goingUp = offset < _lastOffset;
       _lastOffset = offset;
 
-      final next = offset > widget.threshold && goingUp;
+      final next = offset > threshold && goingUp;
       if (next != _visible) setState(() => _visible = next);
     }
 
     if (notification is ScrollEndNotification &&
-        notification.metrics.pixels <= widget.threshold &&
+        notification.metrics.pixels <= threshold &&
         _visible) {
       setState(() => _visible = false);
     }

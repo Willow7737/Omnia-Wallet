@@ -204,6 +204,43 @@ void main() {
       ]);
     });
 
+    test('draws no elbow once parent and child share a column', () {
+      // Past the indent cap they sit at the same x. An elbow there has no gap
+      // to cross, so it hooked out to the right and came back through the
+      // avatar — visible as a stray tick beside deeply nested replies.
+      final capped = plan(
+        depth: ThreadGeometry.maxIndent + 1,
+        ancestorRails: List.filled(ThreadGeometry.maxIndent + 1, false),
+        isLastChild: false,
+      );
+      expect(capped.elbow, isNull);
+      expect(capped.parentRailBelowX, isNull);
+
+      // One level shallower there is still a gap, so the elbow stays.
+      expect(
+        plan(
+          depth: ThreadGeometry.maxIndent,
+          ancestorRails: List.filled(ThreadGeometry.maxIndent, false),
+        ).elbow,
+        isNotNull,
+      );
+    });
+
+    test('keeps ancestor rails out of the row they run beside', () {
+      // At and past the cap, several levels resolve to the same column; a
+      // rail there would be painted over this row's own avatar.
+      final deep = plan(
+        depth: ThreadGeometry.maxIndent + 2,
+        ancestorRails: List.filled(ThreadGeometry.maxIndent + 2, true),
+      );
+      final ownLeft = ThreadGeometry.indentFor(ThreadGeometry.maxIndent + 2);
+      for (final x in deep.railXs) {
+        expect(x, lessThan(ownLeft));
+      }
+      // …and none of them is drawn twice.
+      expect(deep.railXs.toSet(), hasLength(deep.railXs.length));
+    });
+
     test('stops indenting past the maximum depth', () {
       // Otherwise a long back-and-forth walks off the right-hand edge.
       final deep = plan(depth: 9, hasChildrenBelow: true).ownRailX;

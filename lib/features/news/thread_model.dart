@@ -135,7 +135,13 @@ ThreadLayout buildThreadLayout(
         isLastChild: !moreAfterThis,
       ));
 
-      walk(child.id, depth + 1, [...ancestorRails, moreAfterThis]);
+      // Top-level comments are separate conversations, not siblings in one
+      // thread. Passing `moreAfterThis` down at depth 0 drew a rail beside
+      // every nested reply that ran on to the *next unrelated comment*,
+      // stitching two of them together — the reported bug. Below the root,
+      // a sibling still to come is exactly what a passing rail means.
+      final railContinues = depth > 0 && moreAfterThis;
+      walk(child.id, depth + 1, [...ancestorRails, railContinues]);
     }
 
     if (shouldCollapse) {
