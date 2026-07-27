@@ -117,21 +117,54 @@ class SupabaseFlutterGateway implements SupabaseGateway {
     return null;
   }
 
+  /// In-flight refresh, so concurrent callers share one request.
+  ///
+  /// The feed asks for a token far more often than it used to — reaction
+  /// counts, reaction writes, replies — and several of those can land in the
+  /// same frame. Supabase rotates the refresh token on every use, so two
+  /// refreshes racing means the second presents a token the first already
+  /// consumed: the server answers "Already Used", gotrue drops the session,
+  /// and the user is signed out for no reason they can see. One request at a
+  /// time removes that entirely.
+  Future<String>? _refreshing;
+
   @override
   Future<String> accessToken() async {
-    var session = _client.auth.currentSession;
+    final session = _client.auth.currentSession;
     if (session == null) {
       throw StateError('Not signed in — sign in with your Omnia account.');
     }
-    if (session.isExpired) {
+    // A token good for at least another minute is worth using as-is. Cutting
+    // it fine means a request that is valid when sent and expired when it
+    // arrives.
+    if (!session.isExpired &&
+        (session.expiresAt ?? 0) >
+            DateTime.now()
+                    .add(const Duration(minutes: 1))
+                    .millisecondsSinceEpoch ~/
+                1000) {
+      return session.accessToken;
+    }
+    return _refreshing ??= _refresh().whenComplete(() => _refreshing = null);
+  }
+
+  Future<String> _refresh() async {
+    try {
       final refreshed = await _client.auth.refreshSession();
-      session = refreshed.session;
+      final token = refreshed.session?.accessToken;
+      if (token == null) {
+        throw StateError('Your session expired. Please sign in again.');
+      }
+      return token;
+    } on AuthException catch (e) {
+      // The refresh token is gone or already spent. There is no recovering
+      // from this in the client, and saying so plainly beats a bare
+      // "Session expired" that gives no idea what to do.
+      throw StateError(
+        'Your Omnia session has ended (${e.message}). Sign in again to '
+        'continue.',
+      );
     }
-    final token = session?.accessToken;
-    if (token == null) {
-      throw StateError('Your session expired. Please sign in again.');
-    }
-    return token;
   }
 
   @override
