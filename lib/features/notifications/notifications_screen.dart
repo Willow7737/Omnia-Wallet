@@ -73,10 +73,11 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ],
       ),
       body: notices.isEmpty
-          ? const OmniaEmptyState(
+          ? OmniaEmptyState(
               icon: Iconsax.notification_copy,
               title: 'Nothing yet',
               message: 'Sends, votes and news will show up here.',
+              bottomInset: tabBarInset(context),
             )
           : ListView.separated(
               padding: EdgeInsets.only(bottom: tabBarInset(context) + Space.xl),

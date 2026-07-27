@@ -487,14 +487,25 @@ class ThreadConnectorPlan {
 
     final ownLeft = ThreadGeometry.indentFor(depth);
 
-    // Ancestor rails must stay in the gutter to this row's left. Past
-    // ThreadGeometry.maxIndent several levels share one column, so without
-    // this the deepest ones would be drawn straight through the avatar — and
-    // drawn repeatedly, on top of each other.
+    // `ancestorRails[level]` says "the ancestor at `level` has a later
+    // sibling". That sibling is drawn one step further left than the ancestor
+    // is, because its own elbow starts from *its* parent's column — so the
+    // rail that runs down to meet it belongs at `centreOf(level - 1)`, not
+    // `centreOf(level)`.
+    //
+    // Drawing it a column too far right was visible as a line hanging under a
+    // reply's avatar and running down to the reply's *aunt*, as though the two
+    // were related. Index 0 is never drawn: a later sibling of a top-level
+    // comment has no elbow at all, because top-level comments are separate
+    // conversations.
+    //
+    // The result is also de-duplicated and kept left of this row's avatar:
+    // past ThreadGeometry.maxIndent several levels resolve to one column, and
+    // the deepest would otherwise be painted over the avatar, repeatedly.
     final rails = <double>{
-      for (var level = 0; level < depth; level++)
+      for (var level = 1; level < depth; level++)
         if (level < ancestorRails.length && ancestorRails[level])
-          if (centreOf(level) < ownLeft) centreOf(level),
+          if (centreOf(level - 1) < ownLeft) centreOf(level - 1),
     }.toList();
 
     ThreadElbow? elbow;

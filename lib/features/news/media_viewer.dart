@@ -117,17 +117,13 @@ class MediaViewer extends StatefulWidget {
     required String heroTag,
     String? caption,
   }) =>
-      PageRouteBuilder<void>(
-        opaque: false,
-        barrierColor: null,
-        transitionDuration: Motion.normal,
-        reverseTransitionDuration: Motion.fast,
-        pageBuilder: (_, __, ___) =>
+      // See OverlayFadeRoute: it also stops the page underneath from sliding
+      // out from behind the viewer, which it otherwise does — visibly, and
+      // before the viewer has finished arriving.
+      OverlayFadeRoute<void>(
+        settings: const RouteSettings(name: '/media'),
+        builder: (_) =>
             MediaViewer(url: url, heroTag: heroTag, caption: caption),
-        // The Hero does the moving; a slide underneath it would fight the
-        // flight path. Only the chrome fades.
-        transitionsBuilder: (_, animation, __, child) =>
-            FadeTransition(opacity: animation, child: child),
       );
 
   @override

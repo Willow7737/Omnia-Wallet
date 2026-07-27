@@ -151,3 +151,36 @@ Page<T> fadeThroughPage<T>({
   required String name,
 }) =>
     pushPage<T>(child: child, key: key, name: name);
+
+/// A route that floats *over* the screen instead of replacing it — the media
+/// viewer, and anything else that fades in on top of what you were reading.
+///
+/// The reason this is a route class rather than a bare [PageRouteBuilder] is
+/// `canTransitionFrom`. Every push normally drives the *previous* route's
+/// secondary animation, and [pushPage] uses that to slide the outgoing screen
+/// a third of the way out and dim it. Correct for a screen that covers what
+/// came before; wrong for one you can see straight through — the page below
+/// visibly slid away a beat before the viewer appeared over it.
+///
+/// Returning false is the framework's own switch for this: the previous
+/// route's secondary animation is left at zero, so it holds perfectly still
+/// while this route fades in and the hero flies.
+class OverlayFadeRoute<T> extends PageRouteBuilder<T> {
+  OverlayFadeRoute({
+    required WidgetBuilder builder,
+    super.settings,
+  }) : super(
+          opaque: false,
+          barrierColor: null,
+          transitionDuration: Motion.normal,
+          reverseTransitionDuration: Motion.fast,
+          pageBuilder: (context, _, __) => builder(context),
+          // Only the chrome fades; the hero does the moving, and a slide
+          // underneath it would fight the flight path.
+          transitionsBuilder: (_, animation, __, child) =>
+              FadeTransition(opacity: animation, child: child),
+        );
+
+  @override
+  bool canTransitionFrom(TransitionRoute<dynamic> previousRoute) => false;
+}

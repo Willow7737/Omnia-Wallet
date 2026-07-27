@@ -716,35 +716,43 @@ class _ToastState extends State<_Toast> with SingleTickerProviderStateMixin {
               begin: const Offset(0, -0.6),
               end: Offset.zero,
             ).animate(curved),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Space.lg,
-                  vertical: Space.md - 2,
-                ),
-                decoration: BoxDecoration(
-                  color: o.bg,
-                  borderRadius: Radii.rFull,
-                  border: Border.all(color: o.borderLow),
-                  boxShadow: o.shadowMd,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(widget.icon, size: 18, color: widget.tint),
-                    const SizedBox(width: Space.sm),
-                    Flexible(
-                      child: Text(
-                        widget.message,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: FontSizes.sm,
-                          fontWeight: Weights.medium,
-                          color: o.text,
+            // The toast is inserted straight into the root Overlay, which has
+            // no Material ancestor — and text with no Material above it is
+            // painted by the framework with a double yellow underline to
+            // flag exactly that. The pill is its own surface, so a
+            // transparent Material is all that is wanted here.
+            child: Material(
+              type: MaterialType.transparency,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Space.lg,
+                    vertical: Space.md - 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: o.bg,
+                    borderRadius: Radii.rFull,
+                    border: Border.all(color: o.borderLow),
+                    boxShadow: o.shadowMd,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(widget.icon, size: 18, color: widget.tint),
+                      const SizedBox(width: Space.sm),
+                      Flexible(
+                        child: Text(
+                          widget.message,
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: FontSizes.sm,
+                            fontWeight: Weights.medium,
+                            color: o.text,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
