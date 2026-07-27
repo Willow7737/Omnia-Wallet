@@ -7,30 +7,30 @@ import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/auth_mode.dart';
-import '../../core/brand/identicon.dart';
 import '../../core/errors.dart';
-import '../../core/format.dart';
 import '../../core/haptics.dart';
 import '../../core/theme.dart';
 import '../../core/ui/button.dart';
 import '../../core/ui/header.dart';
 import '../../core/ui/list_row.dart';
 import '../../core/ui/press.dart';
+import '../../core/ui/scroll_to_top.dart';
 import '../../core/ui/sheet.dart';
 import '../../core/ui/states.dart';
-import '../../core/ui/thread.dart';
 import '../../data/news.dart';
 import '../../state/blocklist.dart';
 import '../../state/news.dart';
 import '../../state/providers.dart';
 import 'news_screen.dart';
+import 'reply_thread.dart';
 
 /// A single post with its conversation.
 ///
-/// Replies use a threaded anatomy: an avatar column with a thin connector line
-/// stitching the thread together, name + relative time on the top row, body
-/// underneath. Replies can be answered (one nesting level), and authors can
-/// edit or delete their own.
+/// Replies use a threaded anatomy: an avatar column with a connector curving
+/// out of the parent's rail, name + relative time on the top row, body
+/// underneath. Any reply can be answered — nesting is unbounded — and authors
+/// can edit or delete their own. See [ThreadedReplies] for the drawing, and
+/// `thread_model.dart` for the layout rules it follows.
 class NewsPostScreen extends ConsumerStatefulWidget {
   const NewsPostScreen({super.key, required this.post});
 
@@ -350,7 +350,9 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
 
   void _startReplyTo(NewsReply reply) {
     Haptics.selection();
-    // One nesting level: answering a child threads under its parent.
+    // Any depth: the answer threads under whatever it answers, and the layout
+    // stops indenting past ThreadGeometry.maxIndent so a long back-and-forth
+    // never runs off the right-hand edge.
     setState(() => _replyTo = reply);
   }
 
@@ -376,35 +378,37 @@ class _NewsPostScreenState extends ConsumerState<NewsPostScreen> {
                 ref.invalidate(newsRepliesProvider(widget.post.id));
                 await ref.read(newsRepliesProvider(widget.post.id).future);
               },
-              child: ListView(
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: const EdgeInsets.only(bottom: Space.xl),
-                children: [
-                  NewsPostCard(post: widget.post, full: true),
-                  const Hairline(),
-                  const OmniaSectionLabel('Replies'),
-                  repliesAsync.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(Space.xxl),
-                      child: Center(child: CircularProgressIndicator()),
+              child: ScrollToTop(
+                child: ListView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.only(bottom: Space.xl),
+                  children: [
+                    NewsPostCard(post: widget.post, full: true),
+                    const Hairline(),
+                    const OmniaSectionLabel('Replies'),
+                    repliesAsync.when(
+                      loading: () => const Padding(
+                        padding: EdgeInsets.all(Space.xxl),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                      error: (e, _) => OmniaErrorState(
+                        message: friendlyError(e).message,
+                        compact: true,
+                        onRetry: () =>
+                            ref.invalidate(newsRepliesProvider(widget.post.id)),
+                      ),
+                      data: (replies) => ThreadedReplies(
+                        replies: replies,
+                        myUserId: myUserId,
+                        blocked: blocked,
+                        canInteract: canReply,
+                        onReply: _startReplyTo,
+                        onMenu: _replyMenu,
+                      ),
                     ),
-                    error: (e, _) => OmniaErrorState(
-                      message: friendlyError(e).message,
-                      compact: true,
-                      onRetry: () =>
-                          ref.invalidate(newsRepliesProvider(widget.post.id)),
-                    ),
-                    data: (replies) => _ThreadedReplies(
-                      replies: replies,
-                      myUserId: myUserId,
-                      blocked: blocked,
-                      canInteract: canReply,
-                      onReply: _startReplyTo,
-                      onMenu: _replyMenu,
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -686,234 +690,6 @@ class _SignInHint extends StatelessWidget {
                 fontSize: FontSizes.sm,
                 height: LineHeights.snug,
                 color: o.textLow,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Thread
-// ---------------------------------------------------------------------------
-
-/// The reply list, laid out the way Threads lays out a conversation.
-///
-/// Top-level replies run down the page, each carrying a hairline rail from its
-/// avatar to the next item so the whole thing reads as one thread. Answers to
-/// a reply indent under it with a smaller avatar, and a run of more than
-/// [_collapseAfter] answers collapses behind a "Show replies" row rather than
-/// pushing the rest of the conversation off screen.
-class _ThreadedReplies extends StatefulWidget {
-  const _ThreadedReplies({
-    required this.replies,
-    required this.myUserId,
-    required this.blocked,
-    required this.canInteract,
-    required this.onReply,
-    required this.onMenu,
-  });
-
-  final List<NewsReply> replies;
-  final String? myUserId;
-  final Set<String> blocked;
-  final bool canInteract;
-  final void Function(NewsReply) onReply;
-  final Future<void> Function(NewsReply, {required bool isMine}) onMenu;
-
-  @override
-  State<_ThreadedReplies> createState() => _ThreadedRepliesState();
-}
-
-class _ThreadedRepliesState extends State<_ThreadedReplies> {
-  /// How many answers to show before collapsing the rest.
-  static const int _collapseAfter = 2;
-
-  /// Parent ids whose collapsed run the user has expanded.
-  final Set<String> _expanded = {};
-
-  bool _isBlocked(NewsReply r) {
-    final key = blockKeyFor(userId: r.userId, name: r.authorName);
-    return key != null && widget.blocked.contains(key);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Hide replies from blocked authors (client-side moderation).
-    final visible = widget.replies.where((r) => !_isBlocked(r)).toList();
-    if (visible.isEmpty) {
-      return OmniaEmptyState(
-        icon: Iconsax.message_copy,
-        title: widget.replies.isEmpty ? 'No replies yet' : 'No replies to show',
-        message: widget.replies.isEmpty
-            ? 'Start the conversation.'
-            : 'The replies here are from people you blocked.',
-        compact: true,
-      );
-    }
-
-    final byParent = <String, List<NewsReply>>{};
-    final topLevel = <NewsReply>[];
-    final ids = {for (final r in visible) r.id};
-    for (final r in visible) {
-      // Treat orphans (parent deleted or blocked) as top-level.
-      if (r.parentId != null && ids.contains(r.parentId)) {
-        byParent.putIfAbsent(r.parentId!, () => []).add(r);
-      } else {
-        topLevel.add(r);
-      }
-    }
-
-    final rows = <Widget>[];
-    for (var i = 0; i < topLevel.length; i++) {
-      final parent = topLevel[i];
-      final children = byParent[parent.id] ?? const <NewsReply>[];
-      final isLastTop = i == topLevel.length - 1;
-
-      final expanded = _expanded.contains(parent.id);
-      final shown = (children.length > _collapseAfter && !expanded)
-          ? children.take(_collapseAfter).toList()
-          : children;
-      final hidden = children.length - shown.length;
-
-      rows.add(_ReplyRow(
-        reply: parent,
-        // The rail continues while anything in this thread is still to come.
-        railBelow: !(isLastTop && children.isEmpty),
-        isMine: widget.myUserId != null && parent.userId == widget.myUserId,
-        canInteract: widget.canInteract,
-        onReply: widget.onReply,
-        onMenu: widget.onMenu,
-      ));
-
-      for (var j = 0; j < shown.length; j++) {
-        final isLastChild = j == shown.length - 1;
-        rows.add(Padding(
-          padding: const EdgeInsets.only(left: _ReplyRow.nestIndent),
-          child: _ReplyRow(
-            reply: shown[j],
-            railBelow: !(isLastTop && isLastChild && hidden == 0),
-            isMine:
-                widget.myUserId != null && shown[j].userId == widget.myUserId,
-            canInteract: widget.canInteract,
-            onReply: widget.onReply,
-            onMenu: widget.onMenu,
-            nested: true,
-          ),
-        ));
-      }
-
-      if (hidden > 0) {
-        rows.add(ThreadMoreReplies(
-          indent: _ReplyRow.nestIndent,
-          label:
-              hidden == 1 ? 'Show 1 more reply' : 'Show $hidden more replies',
-          avatars: [
-            for (final r in children.skip(shown.length))
-              Identicon(seed: r.authorDid ?? r.authorName, size: 18),
-          ],
-          onTap: () {
-            Haptics.selection();
-            setState(() => _expanded.add(parent.id));
-          },
-        ));
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-      child: Column(children: rows),
-    );
-  }
-}
-
-/// One item in the thread: avatar and rail on the left, identity/body/actions
-/// on the right, overflow pinned to the far right.
-class _ReplyRow extends StatelessWidget {
-  const _ReplyRow({
-    required this.reply,
-    required this.railBelow,
-    required this.isMine,
-    required this.canInteract,
-    required this.onReply,
-    required this.onMenu,
-    this.nested = false,
-  });
-
-  final NewsReply reply;
-  final bool railBelow;
-  final bool isMine;
-  final bool canInteract;
-  final bool nested;
-  final void Function(NewsReply) onReply;
-  final Future<void> Function(NewsReply, {required bool isMine}) onMenu;
-
-  /// How far an answer indents under the reply it answers. Matches the width
-  /// of the parent's avatar column plus its gutter, so a child's rail lines up
-  /// inside its parent's.
-  static const double nestIndent = 34 + Space.md;
-
-  @override
-  Widget build(BuildContext context) {
-    final o = context.omnia;
-    final theme = Theme.of(context);
-    final avatarSize = nested ? 28.0 : 34.0;
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ThreadRail(
-            size: avatarSize,
-            railBelow: railBelow,
-            avatar: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: o.borderLow),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Identicon(
-                seed: reply.authorDid ?? reply.authorName,
-                size: avatarSize,
-              ),
-            ),
-          ),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: railBelow ? Space.sm : Space.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ThreadHeader(
-                    name: reply.authorName,
-                    timestamp: Fmt.relative(reply.createdAt),
-                    nameStyle: theme.textTheme.titleSmall,
-                    onMore: () => onMenu(reply, isMine: isMine),
-                  ),
-                  Text(
-                    reply.body,
-                    style: theme.textTheme.bodyMedium
-                        ?.copyWith(color: o.textHigh, height: 1.4),
-                  ),
-                  if (reply.imageUrl != null) ...[
-                    const SizedBox(height: Space.sm),
-                    NewsImage(url: reply.imageUrl!, maxHeight: 220),
-                  ],
-                  // Only top-level replies can be answered — one nesting
-                  // level, so a child has nowhere deeper to go.
-                  if (canInteract && !nested)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: ThreadAction(
-                        icon: Iconsax.message_copy,
-                        label: 'Reply',
-                        onTap: () => onReply(reply),
-                      ),
-                    ),
-                ],
               ),
             ),
           ),

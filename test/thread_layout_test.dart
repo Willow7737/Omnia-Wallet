@@ -126,52 +126,92 @@ void main() {
     });
   });
 
-  group('ThreadRail', () {
-    testWidgets('draws a connector below the avatar when asked',
-        (tester) async {
-      Future<void> pumpRail({required bool railBelow}) async {
-        await tester.pumpWidget(
-          MaterialApp(
-            theme: OmniaTheme.light(),
-            home: Scaffold(
-              body: SizedBox(
-                height: 200,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    ThreadRail(
-                      size: 34,
-                      railBelow: railBelow,
-                      avatar: const ColoredBox(color: Color(0xFF000000)),
-                    ),
-                    const Expanded(child: SizedBox()),
-                  ],
-                ),
-              ),
-            ),
-          ),
+  // Connectors paint happily when they are wrong — a rail to nowhere throws
+  // nothing and renders fine. The geometry is therefore computed before
+  // anything is drawn, and asserted on directly.
+  group('ThreadConnectorPlan', () {
+    const avatar = 34.0;
+
+    ThreadConnectorPlan plan({
+      int depth = 0,
+      List<bool> ancestorRails = const [],
+      bool hasChildrenBelow = false,
+      bool isLastChild = true,
+    }) =>
+        ThreadConnectorPlan.forRow(
+          depth: depth,
+          ancestorRails: ancestorRails,
+          hasChildrenBelow: hasChildrenBelow,
+          isLastChild: isLastChild,
+          avatarSize: avatar,
         );
-        await tester.pump();
-      }
 
-      await pumpRail(railBelow: true);
-      final withRail = tester.widgetList(
-        find.descendant(
-          of: find.byType(ThreadRail),
-          matching: find.byType(Container),
-        ),
-      );
-      expect(withRail, isNotEmpty, reason: 'no rail was drawn');
+    test('a childless comment trails no rail', () {
+      // The reported bug: a comment with no answers still had a connector
+      // hanging off it, pointing at the unrelated comment below.
+      expect(plan().ownRailX, isNull);
+      expect(plan().elbow, isNull);
+      expect(plan().railXs, isEmpty);
+    });
 
-      await pumpRail(railBelow: false);
-      expect(
-        find.descendant(
-          of: find.byType(ThreadRail),
-          matching: find.byType(Container),
-        ),
-        findsNothing,
-        reason: 'the last item in a thread must not trail a connector',
+    test('a comment with answers carries a rail below its avatar', () {
+      final p = plan(hasChildrenBelow: true);
+      expect(p.ownRailX, avatar / 2);
+      // Starting at the avatar's centre would draw the line *through* the
+      // face; it has to begin below it.
+      expect(p.ownRailTop, greaterThan(avatar));
+    });
+
+    test('a reply curves out of its own parent, not some other level', () {
+      final p = plan(depth: 2, ancestorRails: const [false, true]);
+      final elbow = p.elbow!;
+
+      // Level 1 is the parent, so the turn must start on level 1's centre.
+      expect(elbow.x, ThreadGeometry.indent * 1 + avatar / 2);
+      // …and arrive at this row's avatar.
+      expect(elbow.endX, ThreadGeometry.indent * 2);
+      expect(elbow.turnY, avatar / 2);
+      expect(elbow.radius, greaterThan(0),
+          reason: 'a zero radius is a square corner, not a curve');
+    });
+
+    test('the curve never inverts, however tight the space', () {
+      // A radius larger than either the horizontal run or the drop would draw
+      // an arc that bulges backwards.
+      final p = ThreadConnectorPlan.forRow(
+        depth: 1,
+        ancestorRails: const [false],
+        hasChildrenBelow: false,
+        isLastChild: true,
+        avatarSize: 8,
       );
+      final elbow = p.elbow!;
+      expect(elbow.radius, lessThanOrEqualTo(elbow.turnY));
+      expect(elbow.radius, lessThanOrEqualTo((elbow.endX - elbow.x).abs()));
+    });
+
+    test("a middle child leaves its parent's rail running on", () {
+      expect(plan(depth: 1, isLastChild: false).parentRailBelowX, avatar / 2);
+      // The last child is where the parent's thread ends.
+      expect(plan(depth: 1, isLastChild: true).parentRailBelowX, isNull);
+    });
+
+    test('only ancestors with siblings still to come draw a passing rail', () {
+      final p = plan(depth: 3, ancestorRails: const [true, false, true]);
+      expect(p.railXs, [
+        avatar / 2,
+        ThreadGeometry.indent * 2 + avatar / 2,
+      ]);
+    });
+
+    test('stops indenting past the maximum depth', () {
+      // Otherwise a long back-and-forth walks off the right-hand edge.
+      final deep = plan(depth: 9, hasChildrenBelow: true).ownRailX;
+      final capped = plan(
+        depth: ThreadGeometry.maxIndent,
+        hasChildrenBelow: true,
+      ).ownRailX;
+      expect(deep, capped);
     });
   });
 }

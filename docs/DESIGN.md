@@ -168,3 +168,90 @@ The previous build had three genuine rendering bugs, all now fixed:
 All brand/illustration SVGs now paint in `currentColor` and are tinted at the call
 site with a `ColorFilter`, so they track the theme. `hero_dots.svg` is replaced by
 `hero_glow.svg`, a 1 KB gradient + `<pattern>` that renders identically at any size.
+
+## 11. Threads — the reply anatomy
+
+Replies follow Threads' anatomy rather than a flat comment list, because a
+conversation with no visible structure reads as a pile of unrelated remarks.
+
+**Geometry** (`ThreadGeometry`, `lib/core/ui/thread.dart`):
+
+| Token       | Value | Why                                                                     |
+| ----------- | ----- | ----------------------------------------------------------------------- |
+| `indent`    | 30    | One avatar's radius plus the gutter — a level is legible without shouting |
+| `thickness` | 2     | 1px is indistinguishable from a row hairline and stops reading as a rail  |
+| `corner`    | 12    | Roughly half the indent, which is what makes the turn read as a quarter-circle rather than a clipped corner |
+| `maxIndent` | 4     | Past this, replies keep threading but stop marching right, or a long argument runs off the screen |
+
+**Three separate problems, three separate places:**
+
+1. *Which rows exist, and in what order* — `buildThreadLayout`
+   (`lib/features/news/thread_model.dart`). A pure function over the flat
+   reply list. It also decides, per row, whether anything is threaded below it
+   and whether each ancestor's rail passes it.
+2. *Where the lines go* — `ThreadConnectorPlan.forRow`. Pure geometry: rail
+   positions, the elbow, the parent rail's continuation.
+3. *Painting* — `ThreadConnectorPainter`, which only draws the plan.
+
+The split exists because connector bugs are silent. A rail running to the
+wrong place lays out and paints without a single warning, so neither `analyze`
+nor a render smoke test can see it; the only thing that catches it is asserting
+on the numbers (`test/thread_model_test.dart`, `test/thread_layout_test.dart`).
+
+The connectors are painted *behind* the row in a `Stack` rather than laid out
+beside it, so an elbow can reach across the gutter into the avatar without any
+widget needing to know the geometry.
+
+**Nesting is unbounded.** Runs of more than three answers below the top level
+are held back behind a "show replies" row — top-level comments never collapse,
+since they are the conversation itself.
+
+## 12. Reactions
+
+One table (`news_reactions`) serves posts and replies; the pair
+`(content_type, content_id)` is the key everywhere. `value` is `+1` or `-1`
+rather than two boolean columns, which keeps "switch my reaction" a single
+upsert and the score a plain `SUM`.
+
+Counts render optimistically — `ReactionTally.toggled` produces exactly the row
+the server will end up holding, and is rolled back if the write fails. A heart
+that waits on a round trip feels broken. Realtime updates arrive over the
+Supabase publication and are coalesced (350 ms), because a popular post would
+otherwise refetch once per like.
+
+`supabase/migrations/20260727000000_news_reactions.sql` must be applied before
+the counts are anything but zero.
+
+## 13. Sticky day headers
+
+Activity groups transfers under pinned day headers. A bare pinned
+`SliverPersistentHeader` pins to the top of the *whole* scroll view and stays
+there for the rest of the list, so every later date piles up underneath it.
+Wrapping each header with its own run in a `SliverMainAxisGroup` pins it only
+within that run, so the next day displaces it — which is what a date-grouped
+list is expected to do. Measured in `test/history_headers_test.dart`.
+
+## 14. Back to top
+
+`ScrollToTop` (`lib/core/ui/scroll_to_top.dart`) floats a pill once the reader
+is more than ~1.5 screens down **and moving upward**. The direction condition
+matters: someone still reading downward has not asked to leave, and covering
+their content with a button while they read is the thing people complain about.
+It rides on whatever scrollable it wraps via scroll notifications, so it needs
+no controller plumbing at the call site.
+
+## 15. Sharing a post
+
+`PostShareCard` paints the card straight onto a canvas rather than
+screenshotting the widget on screen. The screenshot approach fails three ways
+here: the card in the feed is clipped by the viewport, it carries interactive
+chrome that has no business in a shared image, and capturing a live
+`RepaintBoundary` needs the widget mounted and painted — which it is not, when
+the share is triggered from a menu that has already covered it. Painting it
+explicitly also makes the whole thing a pure function of a `NewsPost`, so it is
+tested without a screen.
+
+The link goes in the share *text*, not in the picture: every share target
+linkifies text and almost none read a URL out of an image. It points at
+`AppConfig.appUrl` — the only Omnia address that resolves for someone who does
+not have the wallet yet, which is exactly who a shared post reaches.

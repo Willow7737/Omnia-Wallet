@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -42,6 +44,18 @@ abstract class SupabaseGateway {
   /// Emits whenever a session becomes available (e.g. the OAuth redirect
   /// completed).
   Stream<void> get signedIn;
+
+  /// Emits whenever any row in [table] is inserted, updated or deleted.
+  ///
+  /// Deliberately carries no payload. A tick is enough to refetch, and a
+  /// refetch is correct even when several events arrive at once or one is
+  /// dropped — reconciling individual row deltas client-side is a source of
+  /// drift that a re-read never has.
+  ///
+  /// The channel is opened when the stream gets its first listener and torn
+  /// down when the last one goes, so a screen nobody is looking at costs
+  /// nothing.
+  Stream<void> tableChanges(String table);
 }
 
 /// Production implementation backed by `supabase_flutter`.
@@ -148,4 +162,37 @@ class SupabaseFlutterGateway implements SupabaseGateway {
           s.event == AuthChangeEvent.signedIn ||
           (s.event == AuthChangeEvent.initialSession && s.session != null))
       .map((_) {});
+
+  @override
+  Stream<void> tableChanges(String table) {
+    // Without Supabase configured there is nothing to listen to, and the feed
+    // still reads fine over the anon REST key — so an empty stream, not a
+    // throw.
+    if (!_initialized) return const Stream<void>.empty();
+
+    late final StreamController<void> controller;
+    RealtimeChannel? channel;
+
+    controller = StreamController<void>.broadcast(
+      onListen: () {
+        channel = _client.channel('public:$table')
+          ..onPostgresChanges(
+            event: PostgresChangeEvent.all,
+            schema: 'public',
+            table: table,
+            callback: (_) {
+              if (!controller.isClosed) controller.add(null);
+            },
+          )
+          ..subscribe();
+      },
+      onCancel: () async {
+        final open = channel;
+        channel = null;
+        if (open != null) await _client.removeChannel(open);
+      },
+    );
+
+    return controller.stream;
+  }
 }

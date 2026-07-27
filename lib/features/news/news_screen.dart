@@ -1,10 +1,17 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/brand/brand.dart';
+import '../../core/config.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
@@ -12,15 +19,18 @@ import '../../core/theme.dart';
 import '../../core/ui/header.dart';
 import '../../core/ui/list_row.dart';
 import '../../core/ui/press.dart';
+import '../../core/ui/scroll_to_top.dart';
 import '../../core/ui/sheet.dart';
 import '../../core/ui/states.dart';
 import '../../core/ui/thread.dart';
 import '../../data/news.dart';
+import '../../data/reactions.dart';
 import '../../state/news.dart';
+import '../../state/reactions.dart';
 import '../shell/app_shell.dart';
-
-/// Posts hearted locally (session-scoped, purely decorative).
-final likedPostsProvider = StateProvider<Set<String>>((ref) => {});
+import 'media_viewer.dart';
+import 'reaction_loader.dart';
+import 'share_card.dart';
 
 /// The News tab.
 ///
@@ -75,71 +85,23 @@ class NewsScreen extends ConsumerWidget {
                 ],
               );
             }
-            return ListView.separated(
-              padding: EdgeInsets.only(bottom: tabBarInset(context) + Space.xl),
-              itemCount: posts.length,
-              separatorBuilder: (_, __) => const Hairline(),
-              itemBuilder: (_, i) => FadeIn(
-                delay: FadeIn.stagger(i),
-                child: NewsPostCard(post: posts[i]),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-/// A network image with graceful loading and error states, used for post
-/// images and reply attachments.
-class NewsImage extends StatelessWidget {
-  const NewsImage({super.key, required this.url, this.maxHeight = 300});
-
-  final String url;
-  final double maxHeight;
-
-  @override
-  Widget build(BuildContext context) {
-    final o = context.omnia;
-    return ClipRRect(
-      borderRadius: Radii.rMd,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: Radii.rMd,
-          border: Border.all(color: o.borderLow),
-        ),
-        constraints: BoxConstraints(maxHeight: maxHeight),
-        width: double.infinity,
-        child: Image.network(
-          url,
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return Container(
-              height: 180,
-              color: o.bg50,
-              alignment: Alignment.center,
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: o.textLow,
-                  value: progress.expectedTotalBytes == null
-                      ? null
-                      : progress.cumulativeBytesLoaded /
-                          progress.expectedTotalBytes!,
+            return ReactionLoader(
+              contentType: ReactionKey.post,
+              ids: [for (final post in posts) post.id],
+              child: ScrollToTop(
+                child: ListView.separated(
+                  padding:
+                      EdgeInsets.only(bottom: tabBarInset(context) + Space.xl),
+                  itemCount: posts.length,
+                  separatorBuilder: (_, __) => const Hairline(),
+                  itemBuilder: (_, i) => FadeIn(
+                    delay: FadeIn.stagger(i),
+                    child: NewsPostCard(post: posts[i]),
+                  ),
                 ),
               ),
             );
           },
-          errorBuilder: (_, __, ___) => Container(
-            height: 120,
-            color: o.bg50,
-            alignment: Alignment.center,
-            child: Icon(Iconsax.gallery_slash_copy, color: o.textLow),
-          ),
         ),
       ),
     );
@@ -154,15 +116,67 @@ class NewsPostCard extends ConsumerWidget {
   final NewsPost post;
   final bool full;
 
-  /// Copy the post to the clipboard. There is no public web permalink yet, so
-  /// "share" is a copy — which is what the overflow menu already offered.
+  /// Share the post as a picture with the app link in the text.
+  ///
+  /// The image carries the post so it is readable at a glance in whatever app
+  /// it lands in; the link is plain text beside it, because every share target
+  /// linkifies text and almost none read a URL out of a picture.
   Future<void> _share(BuildContext context) async {
     Haptics.selection();
-    await Clipboard.setData(
-      ClipboardData(text: '${post.title}\n\n${post.body}'),
-    );
-    if (context.mounted) {
-      showOmniaToast(context, message: 'Post copied');
+    try {
+      // Render under a progress overlay, then hand off — the OS share sheet
+      // must come up over the post, not over a spinner of ours.
+      final path = await runWithOverlay(
+        context,
+        message: 'Preparing…',
+        () async {
+          final bytes = await PostShareCard.render(
+            post: post,
+            link: AppConfig.appUrl,
+            image: await _decodePostImage(),
+          );
+          final dir = await getTemporaryDirectory();
+          final file = File('${dir.path}/omnia-post-${post.id}.png');
+          await file.writeAsBytes(bytes, flush: true);
+          return file.path;
+        },
+      );
+
+      await Share.shareXFiles(
+        [XFile(path, mimeType: 'image/png')],
+        subject: post.title,
+        text: '${post.title}\n\n${AppConfig.appUrl}',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        Haptics.error();
+        showOmniaToast(context, message: friendlyError(e).message, error: true);
+      }
+    }
+  }
+
+  /// Fetch and decode the post's picture for the share card, or null.
+  ///
+  /// A share must not fail because an image did not download — the card is
+  /// still worth sharing without it.
+  Future<ui.Image?> _decodePostImage() async {
+    final url = post.imageUrl;
+    if (url == null || url.isEmpty) return null;
+    try {
+      final response = await Dio().get<List<int>>(
+        url,
+        options: Options(
+          responseType: ResponseType.bytes,
+          receiveTimeout: const Duration(seconds: 12),
+        ),
+      );
+      final bytes = response.data;
+      if (bytes == null || bytes.isEmpty) return null;
+      final codec = await ui.instantiateImageCodec(Uint8List.fromList(bytes));
+      final frame = await codec.getNextFrame();
+      return frame.image;
+    } catch (_) {
+      return null;
     }
   }
 
@@ -197,11 +211,32 @@ class NewsPostCard extends ConsumerWidget {
     }
   }
 
+  Future<void> _react(BuildContext context, WidgetRef ref) async {
+    Haptics.selection();
+    try {
+      await ref.read(reactionsProvider.notifier).toggle(
+            contentType: ReactionKey.post,
+            contentId: post.id,
+            direction: 1,
+          );
+    } catch (_) {
+      if (context.mounted) {
+        showOmniaToast(context, message: 'Sign in to react', error: true);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final o = context.omnia;
     final theme = Theme.of(context);
-    final liked = ref.watch(likedPostsProvider).contains(post.id);
+    final tally = ref.watch(
+      reactionsProvider.select(
+        (all) =>
+            all[ReactionKey(ReactionKey.post, post.id)] ??
+            const ReactionTally(),
+      ),
+    );
 
     return Pressable(
       onTap: full ? null : () => context.push('/post', extra: post),
@@ -255,9 +290,13 @@ class NewsPostCard extends ConsumerWidget {
               style: theme.textTheme.bodyMedium?.copyWith(color: o.textHigh),
             ),
 
-            if (post.imageUrl != null) ...[
+            if (post.imageUrl case final url? when url.isNotEmpty) ...[
               const SizedBox(height: Space.md),
-              NewsImage(url: post.imageUrl!),
+              MediaThumb(
+                url: url,
+                heroTag: 'post-media-${post.id}',
+                caption: post.title,
+              ),
             ],
 
             if (post.tags.isNotEmpty) ...[
@@ -284,14 +323,9 @@ class NewsPostCard extends ConsumerWidget {
             Row(
               children: [
                 ThreadLikeAction(
-                  liked: liked,
-                  onTap: () {
-                    Haptics.selection();
-                    final notifier = ref.read(likedPostsProvider.notifier);
-                    final next = {...notifier.state};
-                    liked ? next.remove(post.id) : next.add(post.id);
-                    notifier.state = next;
-                  },
+                  liked: tally.liked,
+                  count: tally.likes,
+                  onTap: () => _react(context, ref),
                 ),
                 const SizedBox(width: ThreadAction.gap),
                 ThreadAction(
