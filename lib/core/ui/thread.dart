@@ -347,9 +347,17 @@ class ThreadMoreReplies extends StatelessWidget {
 
   static const double _size = 18;
 
+  /// The avatar size of the comment this marker hangs under — a reply's, not
+  /// the marker's own smaller faces. Only used to line the two up.
+  static const double _parentAvatar = 34;
+
   /// Each face overlaps the previous by a third of its width, and the chevron
   /// badge caps the stack.
   static double stackWidth(int faces) => _size + faces * (_size * 0.66);
+
+  /// Where this row starts, relative to the depth's indent.
+  static double insetFor(int depth) =>
+      ThreadGeometry.markerInset(depth, _parentAvatar);
 
   @override
   Widget build(BuildContext context) {
@@ -368,6 +376,9 @@ class ThreadMoreReplies extends StatelessWidget {
         child: ThreadItem(
           depth: depth,
           ancestorRails: ancestorRails,
+          // Lined up with the body text of the comment above, not with the
+          // avatar column — see ThreadGeometry.markerInset.
+          leadingInset: insetFor(depth),
           // Nothing is threaded below a marker, and it is the end of its own
           // run — it *is* the rest of the run.
           hasChildrenBelow: false,
@@ -457,6 +468,20 @@ class ThreadGeometry {
   static const int maxIndent = 4;
 
   static double indentFor(int depth) => indent * (depth.clamp(0, maxIndent));
+
+  /// How far right of its own indent a "show replies" marker sits.
+  ///
+  /// The marker lines up with the **body text of the comment above it**, not
+  /// with the avatar column of the replies it stands for. One indent is
+  /// narrower than an avatar plus its gutter, so sitting at the plain indent
+  /// left the faces adrift — past the parent's avatar but short of its text,
+  /// aligned to nothing on screen.
+  ///
+  /// Computed rather than fixed because past [maxIndent] the parent shares
+  /// this row's column, and the marker then has to clear the parent's avatar
+  /// entirely instead of the usual few points.
+  static double markerInset(int depth, double parentAvatarSize) =>
+      (indentFor(depth - 1) + parentAvatarSize + Space.md) - indentFor(depth);
 }
 
 /// The quarter-circle turning out of a parent's rail into a reply's avatar.
@@ -545,12 +570,16 @@ class ThreadConnectorPlan {
     required bool hasChildrenBelow,
     required bool isLastChild,
     required double avatarSize,
+    double leadingInset = 0,
   }) {
     double centreOf(int level) =>
         ThreadGeometry.indentFor(level) + avatarSize / 2;
     final turnY = avatarSize / 2;
 
-    final ownLeft = ThreadGeometry.indentFor(depth);
+    // Only *this* row's leading edge moves. Ancestor rails and the parent's
+    // column belong to rows that have not shifted, so an inset here must not
+    // drag them along — the elbow simply reaches further.
+    final ownLeft = ThreadGeometry.indentFor(depth) + leadingInset;
 
     // `ancestorRails[level]` says "the ancestor at `level` has a later
     // sibling". That sibling is drawn one step further left than the ancestor
@@ -602,7 +631,7 @@ class ThreadConnectorPlan {
       railXs: List.unmodifiable(rails),
       elbow: elbow,
       parentRailBelowX: parentBelow,
-      ownRailX: hasChildrenBelow ? centreOf(depth) : null,
+      ownRailX: hasChildrenBelow ? ownLeft + avatarSize / 2 : null,
       ownRailTop: avatarSize + Space.xs,
     );
   }
@@ -617,6 +646,7 @@ class ThreadConnectorPainter extends CustomPainter {
     required this.isLastChild,
     required this.avatarSize,
     required this.color,
+    this.leadingInset = 0,
   });
 
   final int depth;
@@ -634,12 +664,17 @@ class ThreadConnectorPainter extends CustomPainter {
   final double avatarSize;
   final Color color;
 
+  /// Extra distance this row's own leading edge sits from its indent. See
+  /// [ThreadGeometry.markerInset].
+  final double leadingInset;
+
   ThreadConnectorPlan get plan => ThreadConnectorPlan.forRow(
         depth: depth,
         ancestorRails: ancestorRails,
         hasChildrenBelow: hasChildrenBelow,
         isLastChild: isLastChild,
         avatarSize: avatarSize,
+        leadingInset: leadingInset,
       );
 
   @override
@@ -683,6 +718,7 @@ class ThreadConnectorPainter extends CustomPainter {
       old.hasChildrenBelow != hasChildrenBelow ||
       old.isLastChild != isLastChild ||
       old.avatarSize != avatarSize ||
+      old.leadingInset != leadingInset ||
       old.color != color ||
       !listEquals(old.ancestorRails, ancestorRails);
 }
@@ -704,6 +740,7 @@ class ThreadItem extends StatelessWidget {
     required this.child,
     this.avatarSize = 34,
     this.avatarWidth,
+    this.leadingInset = 0,
   });
 
   final int depth;
@@ -722,10 +759,14 @@ class ThreadItem extends StatelessWidget {
   /// place. Defaults to [avatarSize].
   final double? avatarWidth;
 
+  /// Shifts this row's leading edge right of its indent, elbow included, so a
+  /// row can align with something other than the avatar column.
+  final double leadingInset;
+
   @override
   Widget build(BuildContext context) {
     final o = context.omnia;
-    final indent = ThreadGeometry.indentFor(depth);
+    final indent = ThreadGeometry.indentFor(depth) + leadingInset;
 
     return IntrinsicHeight(
       child: Stack(
@@ -738,6 +779,7 @@ class ThreadItem extends StatelessWidget {
                 hasChildrenBelow: hasChildrenBelow,
                 isLastChild: isLastChild,
                 avatarSize: avatarSize,
+                leadingInset: leadingInset,
                 color: o.borderMedium,
               ),
             ),
