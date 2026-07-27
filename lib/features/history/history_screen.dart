@@ -9,6 +9,7 @@ import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/ui/header.dart';
 import '../../core/ui/press.dart';
+import '../../core/ui/scroll_to_top.dart';
 import '../../core/ui/states.dart';
 import '../../data/models.dart';
 import '../../state/providers.dart';
@@ -21,7 +22,9 @@ enum _Scope { all, mine }
 ///
 /// "All" shows network activity; "Mine" narrows to transfers this wallet sent.
 /// Rows are grouped under sticky day headers, which is what turns a flat log
-/// into something you can actually navigate.
+/// into something you can actually navigate. Each header pins only over its
+/// own day and is displaced by the next one — see the note on
+/// [SliverMainAxisGroup] below.
 class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
@@ -100,24 +103,37 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
             // Already newest-first from historyProvider.
             final sections = _groupByDay(visible);
-            return CustomScrollView(
-              slivers: [
-                for (final section in sections) ...[
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: _DayHeaderDelegate(label: section.label),
-                  ),
-                  SliverList.builder(
-                    itemCount: section.records.length,
-                    itemBuilder: (_, i) => TransferTile(
-                      record: section.records[i],
+            return ScrollToTop(
+              bottomInset: tabBarInset(context),
+              child: CustomScrollView(
+                slivers: [
+                  for (final section in sections)
+                    // The group is what makes one date *replace* the last one
+                    // rather than stack under it. A bare pinned header pins to
+                    // the top of the whole scroll view and stays there for the
+                    // rest of the list; inside a SliverMainAxisGroup it pins
+                    // only within its own run, so the next day's header pushes
+                    // it out of the way as it arrives — which is the behaviour
+                    // every date-grouped list is expected to have.
+                    SliverMainAxisGroup(
+                      slivers: [
+                        SliverPersistentHeader(
+                          pinned: true,
+                          delegate: _DayHeaderDelegate(label: section.label),
+                        ),
+                        SliverList.builder(
+                          itemCount: section.records.length,
+                          itemBuilder: (_, i) => TransferTile(
+                            record: section.records[i],
+                          ),
+                        ),
+                      ],
                     ),
+                  SliverToBoxAdapter(
+                    child: SizedBox(height: tabBarInset(context) + Space.xl),
                   ),
                 ],
-                SliverToBoxAdapter(
-                  child: SizedBox(height: tabBarInset(context) + Space.xl),
-                ),
-              ],
+              ),
             );
           },
         ),

@@ -54,6 +54,9 @@ class FakeGateway implements SupabaseGateway {
 
   @override
   Stream<void> get signedIn => const Stream.empty();
+
+  @override
+  Stream<void> tableChanges(String table) => const Stream.empty();
 }
 
 void main() {

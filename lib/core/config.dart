@@ -137,6 +137,20 @@ class AppConfig {
   /// Supabase → Auth → URL Configuration → Redirect URLs.
   static const String oauthRedirectUri = 'io.omnia.wallet://login-callback/';
 
+  // ---- Sharing ----
+
+  /// Where a shared post sends the reader.
+  ///
+  /// The Omnia web app is the public front door — the only Omnia address that
+  /// resolves for someone who does not have the wallet installed yet, which is
+  /// exactly who a shared post reaches. Override with
+  /// `--dart-define=OMNIA_APP_URL=https://your-domain` once a dedicated
+  /// domain (or a per-post permalink route) exists.
+  static const String appUrl = String.fromEnvironment(
+    'OMNIA_APP_URL',
+    defaultValue: 'https://willow7737.github.io/omnia-web/',
+  );
+
   /// Secure-storage keys.
   static const String kSeedKey = 'omnia.wallet.seed';
   static const String kMnemonicKey = 'omnia.wallet.mnemonic';

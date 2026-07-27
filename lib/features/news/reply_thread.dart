@@ -1,0 +1,253 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:iconsax_flutter/iconsax_flutter.dart';
+
+import '../../core/brand/identicon.dart';
+import '../../core/format.dart';
+import '../../core/haptics.dart';
+import '../../core/theme.dart';
+import '../../core/ui/sheet.dart';
+import '../../core/ui/states.dart';
+import '../../core/ui/thread.dart';
+import '../../data/news.dart';
+import '../../data/reactions.dart';
+import '../../state/blocklist.dart';
+import '../../state/reactions.dart';
+import 'media_viewer.dart';
+import 'reaction_loader.dart';
+import 'thread_model.dart';
+
+/// The conversation under a post, drawn the way Threads draws one.
+///
+/// Everything about *which* rows exist and *where the connectors run* is
+/// decided by [buildThreadLayout] — a pure function with its own tests. This
+/// widget only paints what that returns, which is what keeps the two hard
+/// cases honest: a childless comment trails no rail, and a reply's elbow
+/// curves out of the exact rail belonging to its parent.
+class ThreadedReplies extends ConsumerStatefulWidget {
+  const ThreadedReplies({
+    super.key,
+    required this.replies,
+    required this.myUserId,
+    required this.blocked,
+    required this.canInteract,
+    required this.onReply,
+    required this.onMenu,
+  });
+
+  final List<NewsReply> replies;
+  final String? myUserId;
+  final Set<String> blocked;
+  final bool canInteract;
+  final void Function(NewsReply reply) onReply;
+  final Future<void> Function(NewsReply reply, {required bool isMine}) onMenu;
+
+  @override
+  ConsumerState<ThreadedReplies> createState() => _ThreadedRepliesState();
+}
+
+class _ThreadedRepliesState extends ConsumerState<ThreadedReplies> {
+  /// Parent ids whose held-back answers the reader has opened.
+  final Set<String> _expanded = {};
+
+  @override
+  Widget build(BuildContext context) {
+    final visible = widget.replies.where((r) {
+      final key = blockKeyFor(userId: r.userId, name: r.authorName);
+      return key == null || !widget.blocked.contains(key);
+    }).toList();
+
+    if (visible.isEmpty) {
+      return const OmniaEmptyState(
+        icon: Iconsax.message_copy,
+        title: 'No replies yet',
+        message: 'Be the first to say something.',
+        compact: true,
+      );
+    }
+
+    final layout = buildThreadLayout(visible, expanded: _expanded);
+
+    return ReactionLoader(
+      contentType: ReactionKey.reply,
+      ids: [for (final r in visible) r.id],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < layout.rows.length; i++) ...[
+            _ReplyRow(
+              row: layout.rows[i],
+              isMine: widget.myUserId != null &&
+                  layout.rows[i].reply.userId == widget.myUserId,
+              canInteract: widget.canInteract,
+              onReply: widget.onReply,
+              onMenu: widget.onMenu,
+            ),
+            if (layout.collapsed[i] case final run?)
+              _CollapsedRun(
+                run: run,
+                onTap: () {
+                  Haptics.selection();
+                  setState(() => _expanded.add(run.parentId));
+                },
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ReplyRow extends ConsumerWidget {
+  const _ReplyRow({
+    required this.row,
+    required this.isMine,
+    required this.canInteract,
+    required this.onReply,
+    required this.onMenu,
+  });
+
+  final ThreadRow row;
+  final bool isMine;
+  final bool canInteract;
+  final void Function(NewsReply reply) onReply;
+  final Future<void> Function(NewsReply reply, {required bool isMine}) onMenu;
+
+  Future<void> _react(
+      BuildContext context, WidgetRef ref, int direction) async {
+    Haptics.selection();
+    try {
+      await ref.read(reactionsProvider.notifier).toggle(
+            contentType: ReactionKey.reply,
+            contentId: row.reply.id,
+            direction: direction,
+          );
+    } catch (_) {
+      if (context.mounted) {
+        showOmniaToast(
+          context,
+          message: 'Sign in to react',
+          error: true,
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final o = context.omnia;
+    final theme = Theme.of(context);
+    final reply = row.reply;
+    final tally = ref.watch(
+      reactionsProvider.select(
+        (all) =>
+            all[ReactionKey(ReactionKey.reply, reply.id)] ??
+            const ReactionTally(),
+      ),
+    );
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, 0),
+      child: ThreadItem(
+        depth: row.depth,
+        ancestorRails: row.ancestorRails,
+        hasChildrenBelow: row.hasChildrenBelow,
+        isLastChild: row.isLastChild,
+        avatar: ClipOval(
+          child: Identicon(seed: reply.authorDid ?? reply.authorName, size: 34),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: Space.sm),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ThreadHeader(
+                name: reply.authorName,
+                timestamp: '· ${Fmt.relative(reply.createdAt)}',
+                onMore: () => onMenu(reply, isMine: isMine),
+                moreTooltip: 'Reply options',
+              ),
+              if (reply.body.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: Space.xs),
+                  child: Text(
+                    reply.body,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: o.textHigh,
+                    ),
+                  ),
+                ),
+              if (reply.imageUrl case final url?) ...[
+                const SizedBox(height: Space.sm),
+                // Constrained rather than full-bleed: a reply's picture is an
+                // aside, and letting it match the post's image would make
+                // every answer shout as loud as the thing it answers.
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 260),
+                  child: MediaThumb(
+                    url: url,
+                    heroTag: 'reply-media-${reply.id}',
+                    maxHeight: 200,
+                  ),
+                ),
+              ],
+              const SizedBox(height: Space.xs),
+              Row(
+                children: [
+                  ThreadLikeAction(
+                    liked: tally.liked,
+                    count: tally.likes,
+                    onTap: () => _react(context, ref, 1),
+                  ),
+                  const SizedBox(width: ThreadAction.gap),
+                  ThreadDislikeAction(
+                    disliked: tally.disliked,
+                    count: tally.dislikes,
+                    onTap: () => _react(context, ref, -1),
+                  ),
+                  if (canInteract) ...[
+                    const SizedBox(width: ThreadAction.gap),
+                    ThreadAction(
+                      icon: Iconsax.message_copy,
+                      label: 'Reply',
+                      onTap: () => onReply(reply),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "Show N replies" standing where the held-back answers will appear.
+class _CollapsedRun extends StatelessWidget {
+  const _CollapsedRun({required this.run, required this.onTap});
+
+  final ThreadCollapsed run;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final n = run.hidden.length;
+    // The marker sits at the depth of the replies it stands in for, so the
+    // parent's rail runs straight down into it.
+    final indent = ThreadGeometry.indentFor(run.depth) + 34 + Space.md;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
+      child: ThreadMoreReplies(
+        indent: indent,
+        label: n == 1 ? 'Show 1 more reply' : 'Show $n more replies',
+        onTap: onTap,
+        avatars: [
+          for (final reply in run.hidden.take(3))
+            Identicon(seed: reply.authorDid ?? reply.authorName, size: 18),
+        ],
+      ),
+    );
+  }
+}
