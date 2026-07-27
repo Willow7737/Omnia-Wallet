@@ -105,10 +105,11 @@ void main() {
           reason: 'no rail is carried across the marker');
     });
 
-    testWidgets('sits in the column of the replies it stands for',
+    testWidgets("lines up with the body text of the comment above it",
         (tester) async {
-      // It used to start a whole avatar-and-gutter further right, floating
-      // beside the thread rather than sitting in it.
+      // One indent is narrower than an avatar plus its gutter, so sitting at
+      // the plain indent left the faces adrift: past the parent's avatar but
+      // short of its text, aligned to nothing on screen.
       await pump(tester, [r('parent'), r('a', parent: 'parent')]);
 
       final marker = find.byType(ThreadMoreReplies);
@@ -117,12 +118,29 @@ void main() {
       );
       expect(item.depth, 1, reason: 'drawn at the depth of the hidden replies');
 
-      final label = tester.getRect(find.text('Show replies'));
-      final expected = Space.lg +
+      // The comment above starts its text one avatar plus a gutter in from
+      // its own indent; the marker's faces begin at exactly that x.
+      final facesLeft = Space.lg +
           ThreadGeometry.indentFor(1) +
-          ThreadMoreReplies.stackWidth(1) +
-          Space.md;
-      expect(label.left, closeTo(expected, 1));
+          ThreadMoreReplies.insetFor(1);
+      expect(facesLeft, Space.lg + ThreadGeometry.indentFor(0) + 34 + Space.md);
+
+      final label = tester.getRect(find.text('Show replies'));
+      expect(
+        label.left,
+        closeTo(facesLeft + ThreadMoreReplies.stackWidth(1) + Space.md, 1),
+      );
+    });
+
+    testWidgets('clears the parent avatar even past the indent cap',
+        (tester) async {
+      // Past ThreadGeometry.maxIndent the parent shares this row's column, so
+      // a fixed nudge would put the faces on top of the parent's avatar.
+      final capped = ThreadGeometry.maxIndent + 2;
+      expect(
+        ThreadGeometry.indentFor(capped) + ThreadMoreReplies.insetFor(capped),
+        ThreadGeometry.indentFor(capped - 1) + 34 + Space.md,
+      );
     });
   });
 
