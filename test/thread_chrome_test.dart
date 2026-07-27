@@ -105,11 +105,7 @@ void main() {
           reason: 'no rail is carried across the marker');
     });
 
-    testWidgets("lines up with the body text of the comment above it",
-        (tester) async {
-      // One indent is narrower than an avatar plus its gutter, so sitting at
-      // the plain indent left the faces adrift: past the parent's avatar but
-      // short of its text, aligned to nothing on screen.
+    testWidgets('stands in the column of the replies it hides', (tester) async {
       await pump(tester, [r('parent'), r('a', parent: 'parent')]);
 
       final marker = find.byType(ThreadMoreReplies);
@@ -118,13 +114,9 @@ void main() {
       );
       expect(item.depth, 1, reason: 'drawn at the depth of the hidden replies');
 
-      // The comment above starts its text one avatar plus a gutter in from
-      // its own indent; the marker's faces begin at exactly that x.
-      final facesLeft = Space.lg +
-          ThreadGeometry.indentFor(1) +
-          ThreadMoreReplies.insetFor(1);
-      expect(facesLeft, Space.lg + ThreadGeometry.indentFor(0) + 34 + Space.md);
-
+      // The faces start where those replies' avatars will, and the label
+      // clears the whole stack plus the usual gutter.
+      final facesLeft = Space.lg + ThreadGeometry.indentFor(1);
       final label = tester.getRect(find.text('Show replies'));
       expect(
         label.left,
@@ -132,15 +124,34 @@ void main() {
       );
     });
 
-    testWidgets('clears the parent avatar even past the indent cap',
-        (tester) async {
-      // Past ThreadGeometry.maxIndent the parent shares this row's column, so
-      // a fixed nudge would put the faces on top of the parent's avatar.
-      final capped = ThreadGeometry.maxIndent + 2;
-      expect(
-        ThreadGeometry.indentFor(capped) + ThreadMoreReplies.insetFor(capped),
-        ThreadGeometry.indentFor(capped - 1) + 34 + Space.md,
-      );
+    test('draws its rails in the thread\'s columns, not its own', () {
+      // The reported break: columns were measured from the row's own leading
+      // element, and a marker's faces are 18pt where an avatar is 34. Every
+      // rail landed 8pt to the left — a stub hanging beside the thread
+      // instead of continuing it, with the elbow starting off the parent's
+      // line.
+      ThreadConnectorPlan planFor(double avatarSize) =>
+          ThreadConnectorPlan.forRow(
+            depth: 2,
+            ancestorRails: const [false, true],
+            hasChildrenBelow: false,
+            isLastChild: true,
+            avatarSize: avatarSize,
+          );
+
+      final reply = planFor(ThreadGeometry.avatar);
+      final marker = planFor(18);
+
+      expect(marker.railXs, isNotEmpty);
+      expect(marker.railXs, reply.railXs);
+      expect(marker.elbow!.x, reply.elbow!.x,
+          reason: 'the elbow must leave the parent\'s actual rail');
+      expect(marker.elbow!.endX, reply.elbow!.endX);
+
+      // Only the height of the turn is this row's own business: it arrives at
+      // the middle of whatever it is pointing at.
+      expect(marker.elbow!.turnY, 9);
+      expect(reply.elbow!.turnY, 17);
     });
   });
 
