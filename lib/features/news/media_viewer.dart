@@ -7,6 +7,39 @@ import '../../core/motion.dart';
 import '../../core/theme.dart';
 import '../../core/ui/press.dart';
 import '../../core/ui/sheet.dart';
+import 'video_attachment.dart';
+
+/// Any attachment on a post or reply, whichever kind it turns out to be.
+///
+/// One entry point so callers never branch on media type — the feed and the
+/// reply thread both just have "the thing attached to this".
+class NewsAttachment extends StatelessWidget {
+  const NewsAttachment({
+    super.key,
+    required this.url,
+    required this.heroTag,
+    this.maxHeight = 300,
+    this.caption,
+  });
+
+  final String url;
+  final String heroTag;
+  final double maxHeight;
+  final String? caption;
+
+  @override
+  Widget build(BuildContext context) {
+    if (isVideoUrl(url)) {
+      return VideoAttachment(url: url, maxHeight: maxHeight * 1.4);
+    }
+    return MediaThumb(
+      url: url,
+      heroTag: heroTag,
+      maxHeight: maxHeight,
+      caption: caption,
+    );
+  }
+}
 
 /// A tappable image in the feed — a post's picture, or one attached to a
 /// reply — that opens full screen.

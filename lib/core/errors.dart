@@ -67,7 +67,14 @@ FriendlyError _fromStatus(DioException error) {
     case 400:
       return FriendlyError(serverMsg ?? 'The request was rejected as invalid.');
     case 401:
-      return const FriendlyError('Your session expired. Please try again.');
+      // The server's own words, when it gave any. A blanket "session
+      // expired" was actively misleading: the node says
+      // `invalid token: InvalidSignature` when its JWT secret does not match
+      // the one the mint function signs with, and that is a deployment
+      // problem no amount of signing in again will fix.
+      return FriendlyError(
+        serverMsg ?? 'Your session expired. Please sign in again.',
+      );
     case 403:
       return FriendlyError(serverMsg ?? 'You are not allowed to do that.');
     case 404:

@@ -55,6 +55,9 @@ dependencies:
   # Share a rendered post card (image + link) to the OS share sheet
   share_plus: ^12.0.0
 
+  # Play video attached to a news post
+  video_player: ^2.9.2
+
   # Open a link preview in the browser. Already present transitively via
   # supabase_flutter's OAuth flow; declared because this app imports it.
   url_launcher: ^6.3.0

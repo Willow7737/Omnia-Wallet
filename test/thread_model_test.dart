@@ -20,6 +20,11 @@ void main() {
   ThreadRow rowFor(ThreadLayout layout, String id) =>
       layout.rows.firstWhere((row) => row.reply.id == id);
 
+  /// Answers are folded by default. The depth and rail tests are about the
+  /// geometry of a fully open thread, so they turn folding off rather than
+  /// expanding node by node.
+  const open = 1 << 20;
+
   group('depth', () {
     test('nests to arbitrary depth', () {
       final layout = buildThreadLayout([
@@ -27,7 +32,7 @@ void main() {
         r('b', parent: 'a'),
         r('c', parent: 'b'),
         r('d', parent: 'c'),
-      ]);
+      ], collapseAfter: open);
 
       expect(layout.rows.map((row) => row.reply.id), ['a', 'b', 'c', 'd']);
       expect(layout.rows.map((row) => row.depth), [0, 1, 2, 3]);
@@ -39,7 +44,7 @@ void main() {
         r('a'),
         r('b'),
         r('c', parent: 'a'),
-      ]);
+      ], collapseAfter: open);
       expect(layout.rows.map((row) => row.reply.id), ['a', 'c', 'b']);
     });
   });
@@ -54,7 +59,8 @@ void main() {
     });
 
     test('a comment with replies carries a rail', () {
-      final layout = buildThreadLayout([r('a'), r('b', parent: 'a')]);
+      final layout =
+          buildThreadLayout([r('a'), r('b', parent: 'a')], collapseAfter: open);
       expect(rowFor(layout, 'a').hasChildrenBelow, isTrue);
       expect(rowFor(layout, 'b').hasChildrenBelow, isFalse);
     });
@@ -65,7 +71,7 @@ void main() {
         r('b', parent: 'a'),
         r('c', parent: 'b'),
         r('d', parent: 'a'),
-      ]);
+      ], collapseAfter: open);
 
       // Level 1 is b's rail: b has a later sibling (d), so it runs on past c
       // to reach it. Level 0 is a's own rail, and a is the only top-level
@@ -94,7 +100,7 @@ void main() {
         r('a'),
         r('answer', parent: 'a'),
         r('unrelated'),
-      ]);
+      ], collapseAfter: open);
 
       expect(
           layout.rows.map((row) => row.reply.id), ['a', 'answer', 'unrelated']);
@@ -114,7 +120,7 @@ void main() {
         r('a1', parent: 'a'),
         r('b', parent: 'root'),
         r('other'),
-      ]);
+      ], collapseAfter: open);
 
       // Level 0 is `root`, which must never continue; level 1 is `a`, which
       // does — `b` is still to come.
@@ -123,6 +129,38 @@ void main() {
   });
 
   group('collapsing', () {
+    test("a comment's answers are folded until asked for", () {
+      final layout = buildThreadLayout([r('a'), r('b', parent: 'a')]);
+
+      expect(layout.rows.map((row) => row.reply.id), ['a']);
+      expect(layout.collapsed, hasLength(1));
+      expect(layout.collapsed.values.single.hidden.map((h) => h.id), ['b']);
+      // The comment still trails a rail down to the marker standing in for
+      // its answers.
+      expect(rowFor(layout, 'a').hasChildrenBelow, isTrue);
+    });
+
+    test('a chain of single replies folds — the case a count rule missed', () {
+      // "More than three" never fired on a back-and-forth of one reply each,
+      // which is exactly the shape that grows longest.
+      final layout = buildThreadLayout([
+        r('a'),
+        r('b', parent: 'a'),
+        r('c', parent: 'b'),
+        r('d', parent: 'c'),
+      ]);
+      expect(layout.rows.map((row) => row.reply.id), ['a']);
+    });
+
+    test('opening one level folds the next', () {
+      final layout = buildThreadLayout(
+        [r('a'), r('b', parent: 'a'), r('c', parent: 'b')],
+        expanded: {'a'},
+      );
+      expect(layout.rows.map((row) => row.reply.id), ['a', 'b']);
+      expect(layout.collapsed.values.single.parentId, 'b');
+    });
+
     test('holds back a long run of answers', () {
       final layout = buildThreadLayout(
         [r('a'), for (var i = 0; i < 6; i++) r('c$i', parent: 'a')],

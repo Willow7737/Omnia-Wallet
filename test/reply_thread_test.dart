@@ -54,6 +54,17 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
   }
 
+  /// Answers are folded until asked for, so a test about nesting has to open
+  /// the thread the way a reader would — one "Show replies" at a time.
+  Future<void> openAll(WidgetTester tester) async {
+    for (var i = 0; i < 12; i++) {
+      final more = find.text('Show replies');
+      if (more.evaluate().isEmpty) return;
+      await tester.tap(more.first);
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+  }
+
   testWidgets('renders a reply to a reply to a reply', (tester) async {
     // Unbounded nesting was the ask; the old widget only handled one level and
     // silently flattened everything below it.
@@ -63,6 +74,7 @@ void main() {
       r('c', parent: 'b'),
       r('d', parent: 'c'),
     ]);
+    await openAll(tester);
 
     expect(find.byType(ThreadItem), findsNWidgets(4));
     for (final id in ['a', 'b', 'c', 'd']) {
@@ -74,6 +86,7 @@ void main() {
   testWidgets('each level starts further right than the one above',
       (tester) async {
     await pump(tester, [r('a'), r('b', parent: 'a'), r('c', parent: 'b')]);
+    await openAll(tester);
 
     final a = tester.getRect(find.text('body of a')).left;
     final b = tester.getRect(find.text('body of b')).left;
@@ -89,6 +102,7 @@ void main() {
       chain.add(r('n$i', parent: 'n${i - 1}'));
     }
     await pump(tester, chain, width: 320);
+    await openAll(tester);
 
     final deepest = tester.getRect(find.text('body of n11'));
     expect(deepest.right, lessThanOrEqualTo(320),
@@ -103,11 +117,14 @@ void main() {
       for (var i = 0; i < 6; i++) r('answer$i', parent: 'a'),
     ]);
 
+    // Folded by default — none of the answers are on screen.
+    expect(find.text('body of answer0'), findsNothing);
     expect(find.text('body of answer5'), findsNothing);
-    expect(find.textContaining('Show'), findsOneWidget);
+    expect(find.text('Show replies'), findsOneWidget);
 
-    await tester.tap(find.textContaining('Show'));
+    await tester.tap(find.text('Show replies'));
     await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('body of answer0'), findsOneWidget);
     expect(find.text('body of answer5'), findsOneWidget);
   });
 
