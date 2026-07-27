@@ -188,7 +188,7 @@ class _ReplyRow extends ConsumerWidget {
                 // every answer shout as loud as the thing it answers.
                 ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 260),
-                  child: MediaThumb(
+                  child: NewsAttachment(
                     url: url,
                     heroTag: 'reply-media-${reply.id}',
                     maxHeight: 200,

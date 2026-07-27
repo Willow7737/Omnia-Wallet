@@ -76,12 +76,18 @@ class ThreadLayout {
 /// Build the render order for [replies].
 ///
 /// [expanded] holds the parent ids whose collapsed runs the user has opened.
-/// Children beyond [collapseAfter] are held back so one busy sub-thread cannot
-/// bury the rest of the conversation.
+///
+/// [collapseAfter] is how many answers a comment shows before the rest are
+/// held back. **Zero by default: a comment's answers are folded until asked
+/// for.** That is what Threads does, and the reason is that a conversation is
+/// browsed at the level of comments — three chatty exchanges should not push
+/// the fourth comment off the screen. A chain of single replies is exactly the
+/// case a "more than three" rule never folded, and exactly the case that grows
+/// longest.
 ThreadLayout buildThreadLayout(
   List<NewsReply> replies, {
   Set<String> expanded = const {},
-  int collapseAfter = 3,
+  int collapseAfter = 0,
 }) {
   final byParent = <String?, List<NewsReply>>{};
   final ids = {for (final r in replies) r.id};

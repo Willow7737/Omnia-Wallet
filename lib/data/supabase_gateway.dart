@@ -174,7 +174,20 @@ class SupabaseFlutterGateway implements SupabaseGateway {
           ? OAuthProvider.google
           : OAuthProvider.github,
       redirectTo: AppConfig.oauthRedirectUri,
-      authScreenLaunchMode: LaunchMode.externalApplication,
+      // A Custom Tab (SFSafariViewController on iOS), not the standalone
+      // browser app.
+      //
+      // `externalApplication` hands the flow to the browser as a separate
+      // task, and when the provider redirects to `io.omnia.wallet://…` the
+      // browser cannot close itself — the tab survives, so *every later
+      // launch of the browser* reopens that URL and Android asks again
+      // whether to open Omnia. It also means the return trip depends on the
+      // app still being alive in the background.
+      //
+      // A Custom Tab is still the real browser — Google refuses embedded
+      // webviews, and this is not one — but it belongs to this app's task, is
+      // dismissed the moment the redirect fires, and leaves nothing behind.
+      authScreenLaunchMode: LaunchMode.inAppBrowserView,
     );
   }
 

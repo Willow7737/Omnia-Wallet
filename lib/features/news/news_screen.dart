@@ -301,16 +301,19 @@ class NewsPostCard extends ConsumerWidget {
 
             if (post.imageUrl case final url? when url.isNotEmpty) ...[
               const SizedBox(height: Space.md),
-              MediaThumb(
+              NewsAttachment(
                 url: url,
                 heroTag: 'post-media-${post.id}',
                 caption: post.title,
               ),
-            ]
-            // A post's own picture and a link card would compete; when the
-            // post has an image of its own, that is the picture.
-            else if (LinkPreviewService.firstUrl(post.body)
-                case final link?) ...[
+            ],
+
+            // A link card as well as the attachment, not instead of it. They
+            // are not the same offer: the attachment is the post, the card is
+            // somewhere else worth going. Suppressing one for the other meant
+            // a post that shipped a clip *and* pointed at the repository could
+            // only show one of them.
+            if (LinkPreviewService.firstUrl(post.body) case final link?) ...[
               const SizedBox(height: Space.md),
               LinkPreviewCard(url: link),
             ],
