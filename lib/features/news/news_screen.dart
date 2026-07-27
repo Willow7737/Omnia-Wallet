@@ -142,10 +142,16 @@ class NewsPostCard extends ConsumerWidget {
         },
       );
 
-      await Share.shareXFiles(
-        [XFile(path, mimeType: 'image/png')],
-        subject: post.title,
-        text: '${post.title}\n\n${AppConfig.appUrl}',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(path, mimeType: 'image/png')],
+          // `subject` is what an email target uses as its subject line;
+          // `text` is the body every other target shows. The link lives in
+          // the text, not the picture — share targets linkify text, and none
+          // of them read a URL out of an image.
+          subject: post.title,
+          text: '${post.title}\n\n${AppConfig.appUrl}',
+        ),
       );
     } catch (e) {
       if (context.mounted) {
