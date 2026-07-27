@@ -6,6 +6,7 @@ import '../../core/brand/identicon.dart';
 import '../../core/format.dart';
 import '../../core/haptics.dart';
 import '../../core/theme.dart';
+import '../../core/ui/list_row.dart';
 import '../../core/ui/sheet.dart';
 import '../../core/ui/states.dart';
 import '../../core/ui/thread.dart';
@@ -75,6 +76,12 @@ class _ThreadedRepliesState extends ConsumerState<ThreadedReplies> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var i = 0; i < layout.rows.length; i++) ...[
+            // A rule between comments, and only between comments. Each
+            // top-level comment starts a separate conversation, so the line
+            // marks where one ends and the next begins; drawing it between
+            // replies too would cut a single thread into slices and undo what
+            // the connectors are saying.
+            if (i > 0 && layout.rows[i].depth == 0) const Hairline(),
             _ReplyRow(
               row: layout.rows[i],
               isMine: widget.myUserId != null &&
@@ -220,7 +227,7 @@ class _ReplyRow extends ConsumerWidget {
   }
 }
 
-/// "Show N replies" standing where the held-back answers will appear.
+/// "Show replies" standing where the held-back answers will appear.
 class _CollapsedRun extends StatelessWidget {
   const _CollapsedRun({required this.run, required this.onTap});
 
@@ -229,7 +236,6 @@ class _CollapsedRun extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final n = run.hidden.length;
     // The marker sits at the depth of the replies it stands in for, so the
     // parent's rail runs straight down into it.
     final indent = ThreadGeometry.indentFor(run.depth) + 34 + Space.md;
@@ -238,7 +244,8 @@ class _CollapsedRun extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: Space.lg),
       child: ThreadMoreReplies(
         indent: indent,
-        label: n == 1 ? 'Show 1 more reply' : 'Show $n more replies',
+        // No count. The faces already say roughly how many, and a number
+        // makes the row read as a statistic rather than an invitation.
         onTap: onTap,
         avatars: [
           for (final reply in run.hidden.take(3))

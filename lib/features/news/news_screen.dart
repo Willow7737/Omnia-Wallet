@@ -279,6 +279,7 @@ class NewsPostCard extends ConsumerWidget {
                   child: ThreadHeader(
                     name: post.author,
                     timestamp: '· ${Fmt.relative(post.createdAt)}',
+                    verified: AppConfig.isVerifiedAuthor(post.author),
                     onMore: () => _menu(context, ref),
                   ),
                 ),

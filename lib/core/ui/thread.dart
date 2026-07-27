@@ -46,6 +46,7 @@ class ThreadHeader extends StatelessWidget {
     this.onMore,
     this.moreTooltip = 'More',
     this.nameStyle,
+    this.verified = false,
   });
 
   final String name;
@@ -53,6 +54,9 @@ class ThreadHeader extends StatelessWidget {
   final VoidCallback? onMore;
   final String moreTooltip;
   final TextStyle? nameStyle;
+
+  /// Shows the verified tick beside the name.
+  final bool verified;
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +76,10 @@ class ThreadHeader extends StatelessWidget {
                   style: nameStyle ?? theme.textTheme.titleMedium,
                 ),
               ),
+              if (verified) ...[
+                const SizedBox(width: Space.xs),
+                const VerifiedBadge(),
+              ],
               const SizedBox(width: Space.xs + 2),
               Text(
                 timestamp,
@@ -90,6 +98,29 @@ class ThreadHeader extends StatelessWidget {
             onTap: onMore,
           ),
       ],
+    );
+  }
+}
+
+/// The verified tick.
+///
+/// Filled rather than outlined, and in the accent blue, because at this size
+/// an outline is mush — the shape has to be readable at 15px beside a name.
+/// Carries a semantics label so it is not silence to a screen reader.
+class VerifiedBadge extends StatelessWidget {
+  const VerifiedBadge({super.key, this.size = 15});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Verified',
+      child: Icon(
+        Iconsax.verify,
+        size: size,
+        color: context.omnia.accent,
+      ),
     );
   }
 }
@@ -318,10 +349,11 @@ class ThreadMoreReplies extends StatelessWidget {
         child: Row(
           children: [
             SizedBox(
-              // Each face overlaps the previous by a third of its width.
-              width: shown.isEmpty
-                  ? 0
-                  : _size + (shown.length - 1) * (_size * 0.66),
+              // Each face overlaps the previous by a third of its width, and
+              // the chevron badge caps the stack — the affordance that says
+              // this opens something, rather than merely listing who is in
+              // there.
+              width: _size + shown.length * (_size * 0.66),
               height: _size,
               child: Stack(
                 children: [
@@ -339,10 +371,28 @@ class ThreadMoreReplies extends StatelessWidget {
                         child: shown[i],
                       ),
                     ),
+                  Positioned(
+                    left: shown.length * (_size * 0.66),
+                    child: Container(
+                      width: _size,
+                      height: _size,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: o.text,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: o.bg, width: 1.5),
+                      ),
+                      child: Icon(
+                        Iconsax.arrow_down_1_copy,
+                        size: 10,
+                        color: o.bg,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            if (shown.isNotEmpty) const SizedBox(width: Space.md),
+            const SizedBox(width: Space.md),
             // Flexible, because this row already starts indented by the depth
             // of the sub-thread it stands in for: deep enough in, or at a
             // large text size, the label is wider than what is left.

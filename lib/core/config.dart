@@ -137,6 +137,23 @@ class AppConfig {
   /// Supabase → Auth → URL Configuration → Redirect URLs.
   static const String oauthRedirectUri = 'io.omnia.wallet://login-callback/';
 
+  // ---- Identity ----
+
+  /// Post authors that carry the verified tick.
+  ///
+  /// **Posts only.** `news_posts` has no INSERT policy, so under RLS nobody
+  /// can write one through the API — its `author` is set by the team and can
+  /// be trusted. A reply's `author_name`, by contrast, is free text supplied
+  /// by whoever is signed in, so matching a name there would hand the tick to
+  /// anyone who set their display name to "omnia". A tick that can be
+  /// self-issued is worse than no tick at all, so [isVerifiedAuthor] is
+  /// deliberately never applied to replies.
+  static const Set<String> verifiedAuthors = {'omnia'};
+
+  /// Whether [name] is an official Omnia post author. See the caveat above.
+  static bool isVerifiedAuthor(String? name) =>
+      name != null && verifiedAuthors.contains(name.trim().toLowerCase());
+
   // ---- Sharing ----
 
   /// Where a shared post sends the reader.
