@@ -56,6 +56,7 @@ class TransferResult {
     required this.status,
     required this.amount,
     required this.newBalance,
+    this.id,
     this.note,
     this.provenance = 'node_attested',
   });
@@ -63,6 +64,12 @@ class TransferResult {
   final String status;
   final int amount;
   final int newBalance;
+
+  /// The transfer's id in the log — the same value [TransferRecord.id]
+  /// carries. Lets the "sent" notification open this exact transfer instead
+  /// of the whole log. Null if an older node omits it.
+  final String? id;
+
   final String? note;
 
   /// Who authorized the spend: `wallet_signed` (the key owner's own
@@ -75,6 +82,7 @@ class TransferResult {
         status: json['status'] as String? ?? 'unknown',
         amount: (json['amount'] as num?)?.toInt() ?? 0,
         newBalance: (json['new_balance'] as num?)?.toInt() ?? 0,
+        id: json['id'] as String?,
         note: json['note'] as String?,
         provenance: json['provenance'] as String? ?? 'node_attested',
       );

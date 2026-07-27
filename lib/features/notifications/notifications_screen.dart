@@ -12,7 +12,9 @@ import '../../core/ui/list_row.dart';
 import '../../core/ui/press.dart';
 import '../../core/ui/sheet.dart';
 import '../../core/ui/states.dart';
+import '../../state/news.dart';
 import '../../state/notices.dart';
+import '../../state/providers.dart';
 import '../shell/app_shell.dart';
 
 /// The in-app notification feed: transactions, votes, wallet events, news.
@@ -104,6 +106,58 @@ class _NoticeTile extends ConsumerWidget {
     };
   }
 
+  /// Open what the notice is *about*, not merely the list it lives in.
+  ///
+  /// A "sent 39 UBC" notification that drops you at the top of the whole
+  /// activity log has told you nothing you did not already know. The subject
+  /// is looked up in the data the app already holds; if it has aged out — the
+  /// transfer is past the end of the log, the post has been deleted — the
+  /// list is the honest fallback rather than an error.
+  void _open(BuildContext context, WidgetRef ref) {
+    // Opening a notification is also the moment it stops being news, so clear
+    // the badge before navigating rather than waiting for the screen's own
+    // mark-all timer.
+    ref.read(noticesProvider.notifier).markAllRead();
+
+    final subjectId = notice.subjectId;
+    if (subjectId != null) {
+      switch (notice.type) {
+        case NoticeType.sent:
+          final record = ref
+              .read(historyProvider)
+              .valueOrNull
+              ?.where((r) => r.id == subjectId)
+              .firstOrNull;
+          if (record != null) {
+            context.push('/tx', extra: record);
+            return;
+          }
+        case NoticeType.news:
+          final post = ref
+              .read(newsPostsProvider)
+              .valueOrNull
+              ?.where((p) => p.id == subjectId)
+              .firstOrNull;
+          if (post != null) {
+            context.push('/post', extra: post);
+            return;
+          }
+        case NoticeType.vote:
+        case NoticeType.wallet:
+          break;
+      }
+    }
+
+    final destination = notice.destination;
+    // Tab roots switch tabs; everything else stacks on top.
+    const tabs = {'/', '/activity', '/news', '/notifications', '/profile'};
+    if (tabs.contains(destination)) {
+      context.go(destination);
+    } else {
+      context.push(destination);
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final o = context.omnia;
@@ -112,20 +166,7 @@ class _NoticeTile extends ConsumerWidget {
     final unread = !notice.read;
 
     return Pressable(
-      onTap: () {
-        // Opening a notification is also the moment it stops being news, so
-        // clear the badge before navigating rather than waiting for the
-        // screen's own mark-all timer.
-        ref.read(noticesProvider.notifier).markAllRead();
-        final destination = notice.destination;
-        // Tab roots switch tabs; everything else stacks on top.
-        const tabs = {'/', '/activity', '/news', '/notifications', '/profile'};
-        if (tabs.contains(destination)) {
-          context.go(destination);
-        } else {
-          context.push(destination);
-        }
-      },
+      onTap: () => _open(context, ref),
       child: Container(
         // Unread rows carry a faint accent wash — the same cue Bluesky uses on
         // an unread notification, and quieter than a coloured dot on every row.

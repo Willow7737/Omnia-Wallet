@@ -116,6 +116,7 @@ class OmniaPalette {
     required this.positive,
     required this.negative,
     required this.pink,
+    required this.red,
     required this.yellow,
   });
 
@@ -129,6 +130,12 @@ class OmniaPalette {
   final List<Color> negative;
 
   final Color pink;
+
+  /// The heart. Kept out of the `negative` ramp on purpose: negative means
+  /// "something went wrong", and a like is the opposite of that — they must
+  /// be free to move independently.
+  final Color red;
+
   final Color yellow;
 
   // -- contrast accessors (index into the 15-stop ramp) --
@@ -191,6 +198,7 @@ class OmniaPalette {
         positive: positive.reversed.toList(growable: false),
         negative: negative.reversed.toList(growable: false),
         pink: pink,
+        red: red,
         yellow: yellow,
       );
 
@@ -200,6 +208,7 @@ class OmniaPalette {
   /// ALF `DEFAULT_PALETTE`.
   static const OmniaPalette defaults = OmniaPalette(
     pink: Color(0xFFEC4899),
+    red: Color(0xFFED4956),
     yellow: Color(0xFFFFC404),
     contrast: [
       Color(0xFFFFFFFF), // 0
@@ -268,6 +277,7 @@ class OmniaPalette {
   /// ALF `DEFAULT_SUBDUED_PALETTE` — the source of the "dim" theme.
   static const OmniaPalette subdued = OmniaPalette(
     pink: Color(0xFFEC4899),
+    red: Color(0xFFED4956),
     yellow: Color(0xFFFFC404),
     contrast: [
       Color(0xFFFFFFFF), // 0

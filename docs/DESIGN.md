@@ -255,3 +255,59 @@ The link goes in the share *text*, not in the picture: every share target
 linkifies text and almost none read a URL out of an image. It points at
 `AppConfig.appUrl` — the only Omnia address that resolves for someone who does
 not have the wallet yet, which is exactly who a shared post reaches.
+
+## 16. Reactions — how a tap is handled
+
+The rule every social app converges on: **the finger drives the screen, the
+network follows.**
+
+1. A tap updates local state immediately and unconditionally.
+2. The write is *coalesced* — ten rapid taps send one request carrying the
+   final state, not ten racing each other.
+3. At most one request per piece of content is outstanding; a tap arriving
+   mid-flight is recorded and sent when that one settles.
+4. A refetch never overwrites content the user is currently interacting with.
+
+Rule 4 is the one that is easy to miss and it caused a real bug: `counts` and
+`mine` are two requests, so a refetch whose `mine` was read *before* the
+user's like landed and whose `counts` was read *after* arrives as "1 like, but
+not yours". The next tap then adds a second like on top of one already made,
+and the count briefly shows 2 before the following refetch corrects it. No
+arithmetic inside `ReactionTally.toggled` can fix that — the stale read has to
+not be applied at all.
+
+A failed write is *not* rolled back to a remembered "before" value; after a
+burst that value is itself stale. The intent is dropped and the server is
+re-read.
+
+Pinned in `test/reactions_notifier_test.dart`, which asserts the request
+count, not just the final state.
+
+## 17. Thread connectors, continued
+
+Two rules the first implementation got wrong, both visible only on screen:
+
+* **Top-level comments are separate conversations.** Passing "this ancestor
+  has a later sibling" down from depth 0 drew a rail beside every nested
+  reply that ran on into the *next unrelated comment*, stitching two of them
+  together.
+* **Past `maxIndent`, parent and child share a column.** An elbow there has no
+  horizontal gap to cross, so it hooked out to the right and came back through
+  the avatar. At the cap there is no elbow: the parent's own rail runs
+  straight down into the child, which is what a depth cap should look like.
+
+## 18. Link previews
+
+Parsed with regular expressions over `<head>`, not an HTML parser. The only
+things needed are four `<meta>` tags, and the parse stops at `</head>` — a
+full DOM would be a large dependency for a decoration, and it would also
+happily read an `og:title` out of body copy.
+
+Only the *first* link in a post gets a card, and only when the post has no
+picture of its own: two images in one post compete, and five links should be
+read rather than turned into five cards. The card shows the **host**, which is
+the one part of a preview a page cannot dress up about itself.
+
+Nothing renders until the metadata resolves and proves useful — no skeleton.
+A card appearing a beat later disrupts less than a placeholder holding space
+for something that may never arrive.

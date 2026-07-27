@@ -485,29 +485,41 @@ class ThreadConnectorPlan {
         ThreadGeometry.indentFor(level) + avatarSize / 2;
     final turnY = avatarSize / 2;
 
-    final rails = <double>[
+    final ownLeft = ThreadGeometry.indentFor(depth);
+
+    // Ancestor rails must stay in the gutter to this row's left. Past
+    // ThreadGeometry.maxIndent several levels share one column, so without
+    // this the deepest ones would be drawn straight through the avatar — and
+    // drawn repeatedly, on top of each other.
+    final rails = <double>{
       for (var level = 0; level < depth; level++)
         if (level < ancestorRails.length && ancestorRails[level])
-          centreOf(level),
-    ];
+          if (centreOf(level) < ownLeft) centreOf(level),
+    }.toList();
 
     ThreadElbow? elbow;
     double? parentBelow;
     if (depth > 0) {
       final parentX = centreOf(depth - 1);
-      final avatarLeft = ThreadGeometry.indentFor(depth);
-      // Never let the corner exceed the space available, or the arc inverts.
-      final radius = ThreadGeometry.corner
-          .clamp(0.0, (avatarLeft - parentX).abs())
-          .clamp(0.0, turnY)
-          .toDouble();
-      elbow = ThreadElbow(
-        x: parentX,
-        turnY: turnY,
-        endX: avatarLeft,
-        radius: radius,
-      );
-      if (!isLastChild) parentBelow = parentX;
+      // Past the indent cap the parent sits in the same column as the child,
+      // so there is no horizontal gap for an elbow to cross. Drawing one
+      // anyway hooks out to the right and then back left through the avatar.
+      // The parent's own rail already runs down into this row, and a straight
+      // thread is what a depth cap is supposed to look like.
+      if (ownLeft > parentX) {
+        // Never let the corner exceed the space available, or the arc inverts.
+        final radius = ThreadGeometry.corner
+            .clamp(0.0, ownLeft - parentX)
+            .clamp(0.0, turnY)
+            .toDouble();
+        elbow = ThreadElbow(
+          x: parentX,
+          turnY: turnY,
+          endX: ownLeft,
+          radius: radius,
+        );
+        if (!isLastChild) parentBelow = parentX;
+      }
     }
 
     return ThreadConnectorPlan(

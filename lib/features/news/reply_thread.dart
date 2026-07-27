@@ -113,24 +113,21 @@ class _ReplyRow extends ConsumerWidget {
   final void Function(NewsReply reply) onReply;
   final Future<void> Function(NewsReply reply, {required bool isMine}) onMenu;
 
-  Future<void> _react(
-      BuildContext context, WidgetRef ref, int direction) async {
-    Haptics.selection();
-    try {
-      await ref.read(reactionsProvider.notifier).toggle(
-            contentType: ReactionKey.reply,
-            contentId: row.reply.id,
-            direction: direction,
-          );
-    } catch (_) {
-      if (context.mounted) {
-        showOmniaToast(
-          context,
-          message: 'Sign in to react',
-          error: true,
-        );
-      }
+  void _react(BuildContext context, WidgetRef ref, int direction) {
+    final reactions = ref.read(reactionsProvider.notifier);
+    if (!reactions.canReact) {
+      showOmniaToast(context, message: 'Sign in to react', error: true);
+      return;
     }
+    Haptics.selection();
+    // Deliberately not awaited: the tally on screen is already updated, and
+    // the write is coalesced. Tapping twice quickly must feel like two taps,
+    // not like two round trips.
+    reactions.toggle(
+      contentType: ReactionKey.reply,
+      contentId: row.reply.id,
+      direction: direction,
+    );
   }
 
   @override

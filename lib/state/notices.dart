@@ -18,6 +18,7 @@ class AppNotice {
     required this.body,
     required this.timestamp,
     this.read = false,
+    this.subjectId,
   });
 
   final String id;
@@ -25,18 +26,23 @@ class AppNotice {
   final String title;
   final String body;
 
+  /// What this notice is *about* — a transfer id, a post id — as opposed to
+  /// [id], which identifies the notice itself.
+  ///
+  /// Stored so a notification can open the one thing it refers to. The
+  /// screens worth deep-linking to take their subject as a route `extra`
+  /// object rather than a path parameter, so the id alone is not a route; the
+  /// tap handler looks the subject up and falls back to the list when it is
+  /// gone (an old notice whose transfer has aged out of the log).
+  final String? subjectId;
+
   /// Unix-millisecond timestamp.
   final int timestamp;
   final bool read;
 
-  /// The route tapping this notice opens. A notification you cannot act on is
-  /// just a receipt.
-  ///
-  /// Derived from the type rather than stored per notice: the two screens
-  /// worth deep-linking to — a single transaction and a single post — both
-  /// take their subject as a route `extra` object, which cannot be written
-  /// into a persisted string. So a "sent" notice opens the activity log with
-  /// that transfer at the top, and a news notice opens the feed.
+  /// Where tapping this notice lands when its subject cannot be resolved —
+  /// the list the subject would have been in. A notification you cannot act
+  /// on is just a receipt.
   String get destination => switch (type) {
         NoticeType.sent => '/activity',
         NoticeType.vote => '/governance',
@@ -52,6 +58,7 @@ class AppNotice {
         title: title,
         body: body,
         timestamp: timestamp,
+        subjectId: subjectId,
         read: true,
       );
 
@@ -62,6 +69,7 @@ class AppNotice {
         'body': body,
         'timestamp': timestamp,
         'read': read,
+        'subjectId': subjectId,
       };
 
   factory AppNotice.fromJson(Map<String, dynamic> json) => AppNotice(
@@ -71,6 +79,9 @@ class AppNotice {
         body: json['body'] as String? ?? '',
         timestamp: (json['timestamp'] as num?)?.toInt() ?? 0,
         read: json['read'] as bool? ?? false,
+        // Absent on notices written before subjects were recorded; those fall
+        // back to the list, which is what they always did.
+        subjectId: json['subjectId'] as String?,
       );
 }
 
@@ -108,6 +119,7 @@ class NoticesNotifier extends StateNotifier<List<AppNotice>> {
     required NoticeType type,
     required String title,
     required String body,
+    String? subjectId,
   }) async {
     final notice = AppNotice(
       id: '${DateTime.now().microsecondsSinceEpoch}',
@@ -115,6 +127,7 @@ class NoticesNotifier extends StateNotifier<List<AppNotice>> {
       title: title,
       body: body,
       timestamp: DateTime.now().millisecondsSinceEpoch,
+      subjectId: subjectId,
     );
     state = [notice, ...state].take(maxEntries).toList();
     await _persist();

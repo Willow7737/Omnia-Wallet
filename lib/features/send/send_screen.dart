@@ -212,6 +212,9 @@ class _SendScreenState extends ConsumerState<SendScreen> {
             title: 'Sent ${Fmt.ubc(result.amount)}',
             body: 'To ${Fmt.shortDid(toDid)} · '
                 'new balance ${Fmt.ubc(result.newBalance)}$signedNote',
+            // So tapping the notification opens this transfer rather than
+            // dropping the reader at the top of the whole log.
+            subjectId: result.id,
           );
       if (!mounted) return;
       Haptics.success();

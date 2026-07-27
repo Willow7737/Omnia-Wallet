@@ -10,6 +10,10 @@ import 'package:omnia_wallet/features/news/share_card.dart';
 /// worth pinning are the embarrassing ones: a blank picture, or text running
 /// off the bottom because the measuring pass and the painting pass disagreed.
 void main() {
+  // The card loads the brand mark from the asset bundle, which needs a
+  // binding — without one the loader fails and the disc comes out empty.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   NewsPost post({
     String title = 'Omnia mainnet is live',
     String body = 'The network is now open.',
@@ -85,6 +89,42 @@ void main() {
     final image = await decode(bytes);
     addTearDown(image.dispose);
     expect(image.height, greaterThan(0));
+  });
+
+  test('draws the real Omnia mark, not a stand-in', () async {
+    // The mark is loaded from the SVG asset and its failure is swallowed so a
+    // share never dies over a logo — which means a broken loader would show
+    // an empty disc and no test would notice. So: look at the disc.
+    final bytes = await PostShareCard.render(
+      post: post(),
+      link: 'https://example.com/',
+    );
+    final image = await decode(bytes);
+    addTearDown(image.dispose);
+
+    final data = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
+    final pixels = data!.buffer.asUint8List();
+
+    // The avatar sits at (28,28) logical, 44 wide, and the card is drawn at
+    // PostShareCard.scale.
+    const s = PostShareCard.scale;
+    final left = (28 * s).round();
+    final top = (28 * s).round();
+    final size = (44 * s).round();
+
+    var inked = 0;
+    for (var y = top; y < top + size; y++) {
+      for (var x = left; x < left + size; x++) {
+        final i = (y * image.width + x) * 4;
+        // The glyph is drawn in the text colour — near-black — while the disc
+        // behind it is a pale grey.
+        if (pixels[i] < 90 && pixels[i + 1] < 90 && pixels[i + 2] < 90) {
+          inked++;
+        }
+      }
+    }
+    expect(inked, greaterThan(100),
+        reason: 'the avatar disc is empty — the brand mark did not render');
   });
 
   test('paints something — the card is not blank', () async {
