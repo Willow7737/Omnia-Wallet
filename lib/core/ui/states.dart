@@ -22,6 +22,7 @@ class OmniaEmptyState extends StatelessWidget {
     this.actionLabel,
     this.onAction,
     this.compact = false,
+    this.bottomInset = 0,
   });
 
   final IconData icon;
@@ -34,12 +35,17 @@ class OmniaEmptyState extends StatelessWidget {
   /// than filling a screen.
   final bool compact;
 
+  /// Space at the bottom that is covered by something floating over the body
+  /// — the tab bar. Without it, "centred" is centred behind that bar and the
+  /// block sits visibly low.
+  final double bottomInset;
+
   @override
   Widget build(BuildContext context) {
     final o = context.omnia;
     final theme = Theme.of(context);
 
-    return Padding(
+    final content = Padding(
       padding: EdgeInsets.symmetric(
         horizontal: Space.x4l,
         vertical: compact ? Space.x4l : Space.x5l + Space.lg,
@@ -73,6 +79,25 @@ class OmniaEmptyState extends StatelessWidget {
           ],
         ],
       ),
+    );
+
+    // Two very different homes for the same widget: inside a scroll view,
+    // where height is unbounded and it must simply take the room it needs;
+    // and filling a screen's body, where a fixed top padding leaves it
+    // stranded in the upper third with a large void underneath. Centring is
+    // only possible — and only correct — in the second case.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (!constraints.hasBoundedHeight) return content;
+        return Center(
+          // Scrollable so a long message at a large text size can still be
+          // read rather than overflowing a fixed height.
+          child: SingleChildScrollView(
+            padding: EdgeInsets.only(bottom: bottomInset),
+            child: content,
+          ),
+        );
+      },
     );
   }
 }

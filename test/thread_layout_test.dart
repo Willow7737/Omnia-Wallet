@@ -196,12 +196,23 @@ void main() {
       expect(plan(depth: 1, isLastChild: true).parentRailBelowX, isNull);
     });
 
-    test('only ancestors with siblings still to come draw a passing rail', () {
-      final p = plan(depth: 3, ancestorRails: const [true, false, true]);
-      expect(p.railXs, [
-        avatar / 2,
-        ThreadGeometry.indent * 2 + avatar / 2,
-      ]);
+    test('a passing rail runs in the column its sibling elbows out of', () {
+      // The reported bug: the rail sat one column too far right, so it hung
+      // off a reply's avatar and ran down to that reply's *aunt* — making two
+      // unrelated replies look like parent and child.
+      //
+      // ancestorRails[2] means "the ancestor at depth 2 has a later sibling".
+      // That sibling is itself at depth 2, and its elbow starts from its own
+      // parent's column — depth 1. So the rail belongs at depth 1's centre.
+      final p = plan(depth: 3, ancestorRails: const [false, false, true]);
+      expect(p.railXs, [ThreadGeometry.indent + avatar / 2]);
+    });
+
+    test('never draws a rail for a later top-level comment', () {
+      // Index 0 would mean "the top-level comment has another comment after
+      // it" — true of nearly every feed, and never a thread connection.
+      final p = plan(depth: 2, ancestorRails: const [true, false]);
+      expect(p.railXs, isEmpty);
     });
 
     test('draws no elbow once parent and child share a column', () {
