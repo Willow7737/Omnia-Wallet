@@ -236,14 +236,13 @@ class _CollapsedRun extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The marker sits at the depth of the replies it stands in for, so the
-    // parent's rail runs straight down into it.
-    final indent = ThreadGeometry.indentFor(run.depth) + 34 + Space.md;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Space.lg),
       child: ThreadMoreReplies(
-        indent: indent,
+        // Drawn at the depth of the replies it stands in for, so the faces
+        // land in their column and the parent's elbow curves into them.
+        depth: run.depth,
+        ancestorRails: run.ancestorRails,
         // No count. The faces already say roughly how many, and a number
         // makes the row read as a statistic rather than an invitation.
         onTap: onTap,

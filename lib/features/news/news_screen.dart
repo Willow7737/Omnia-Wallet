@@ -33,6 +33,7 @@ import 'link_card.dart';
 import 'media_viewer.dart';
 import 'reaction_loader.dart';
 import 'share_card.dart';
+import 'video_attachment.dart';
 
 /// The News tab.
 ///
@@ -170,6 +171,9 @@ class NewsPostCard extends ConsumerWidget {
   Future<ui.Image?> _decodePostImage() async {
     final url = post.imageUrl;
     if (url == null || url.isEmpty) return null;
+    // A video would download in full and then fail to decode — megabytes of
+    // someone's data spent to arrive at null. The card is fine without it.
+    if (isVideoUrl(url)) return null;
     try {
       final response = await Dio().get<List<int>>(
         url,

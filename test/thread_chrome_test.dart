@@ -78,6 +78,54 @@ void main() {
     });
   });
 
+  group('show replies marker', () {
+    testWidgets('is a thread row, so rails passing it are drawn',
+        (tester) async {
+      // The reported gap: the marker was a plain indented label, so an
+      // ancestor's rail simply stopped above it and picked up again below —
+      // the thread visibly broke across the row.
+      await pump(tester, [
+        r('parent'),
+        r('a', parent: 'parent'),
+        r('a1', parent: 'a'),
+        r('b', parent: 'parent'),
+      ]);
+      await tester.tap(find.text('Show replies').first);
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final marker = find.byType(ThreadMoreReplies);
+      expect(marker, findsOneWidget);
+
+      final item = tester.widget<ThreadItem>(
+        find.descendant(of: marker, matching: find.byType(ThreadItem)),
+      );
+      // `a` still has `b` to come, so its parent's rail must pass this row.
+      expect(item.ancestorRails, isNotEmpty);
+      expect(item.ancestorRails.last, isTrue,
+          reason: 'no rail is carried across the marker');
+    });
+
+    testWidgets('sits in the column of the replies it stands for',
+        (tester) async {
+      // It used to start a whole avatar-and-gutter further right, floating
+      // beside the thread rather than sitting in it.
+      await pump(tester, [r('parent'), r('a', parent: 'parent')]);
+
+      final marker = find.byType(ThreadMoreReplies);
+      final item = tester.widget<ThreadItem>(
+        find.descendant(of: marker, matching: find.byType(ThreadItem)),
+      );
+      expect(item.depth, 1, reason: 'drawn at the depth of the hidden replies');
+
+      final label = tester.getRect(find.text('Show replies'));
+      final expected = Space.lg +
+          ThreadGeometry.indentFor(1) +
+          ThreadMoreReplies.stackWidth(1) +
+          Space.md;
+      expect(label.left, closeTo(expected, 1));
+    });
+  });
+
   group('verified', () {
     test('only the official post author qualifies', () {
       expect(AppConfig.isVerifiedAuthor('omnia'), isTrue);

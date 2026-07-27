@@ -312,24 +312,44 @@ class ThreadDislikeAction extends StatelessWidget {
       );
 }
 
-/// "Show replies", with the stacked avatars of the people in the sub-thread —
-/// Threads' affordance for a collapsed run.
+/// "Show replies": the stacked faces of who is in the held-back sub-thread,
+/// a chevron badge, and the invitation.
+///
+/// Built as a [ThreadItem] rather than a plain indented row, which is what
+/// makes it behave like part of the thread instead of a label floating beside
+/// it. Two things follow from that and both were wrong before:
+///
+///  * the faces land in the same column as the avatars of the replies they
+///    stand in for, and the parent's elbow curves into them; and
+///  * any ancestor rail that passes this row is painted, so a parent with
+///    another answer still to come keeps its line running down the left
+///    instead of breaking across the marker.
 class ThreadMoreReplies extends StatelessWidget {
   const ThreadMoreReplies({
     super.key,
     required this.avatars,
     required this.onTap,
+    required this.depth,
+    required this.ancestorRails,
     this.label = 'Show replies',
-    this.indent = 0,
   });
 
   /// Up to three faces are drawn; the rest are implied.
   final List<Widget> avatars;
   final VoidCallback onTap;
+
+  /// Depth of the replies this stands in for — the same depth they would be
+  /// drawn at, so it sits exactly where they will appear.
+  final int depth;
+
+  final List<bool> ancestorRails;
   final String label;
-  final double indent;
 
   static const double _size = 18;
+
+  /// Each face overlaps the previous by a third of its width, and the chevron
+  /// badge caps the stack.
+  static double stackWidth(int faces) => _size + faces * (_size * 0.66);
 
   @override
   Widget build(BuildContext context) {
@@ -340,76 +360,71 @@ class ThreadMoreReplies extends StatelessWidget {
       onTap: onTap,
       feel: PressFeel.subtle,
       semanticLabel: label,
+      // Padded exactly like a reply row: the gap above sits outside the
+      // painted area, the gap below sits inside it. Padding both sides on the
+      // outside left a double-width break in any rail passing this row.
       child: Padding(
-        padding: EdgeInsets.only(
-          left: indent,
-          top: Space.sm,
-          bottom: Space.sm,
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              // Each face overlaps the previous by a third of its width, and
-              // the chevron badge caps the stack — the affordance that says
-              // this opens something, rather than merely listing who is in
-              // there.
-              width: _size + shown.length * (_size * 0.66),
-              height: _size,
-              child: Stack(
-                children: [
-                  for (var i = 0; i < shown.length; i++)
-                    Positioned(
-                      left: i * (_size * 0.66),
-                      child: Container(
-                        width: _size,
-                        height: _size,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: o.bg, width: 1.5),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: shown[i],
-                      ),
+        padding: const EdgeInsets.only(top: Space.sm),
+        child: ThreadItem(
+          depth: depth,
+          ancestorRails: ancestorRails,
+          // Nothing is threaded below a marker, and it is the end of its own
+          // run — it *is* the rest of the run.
+          hasChildrenBelow: false,
+          isLastChild: true,
+          avatarSize: _size,
+          avatarWidth: stackWidth(shown.length),
+          avatar: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (var i = 0; i < shown.length; i++)
+                Positioned(
+                  left: i * (_size * 0.66),
+                  child: Container(
+                    width: _size,
+                    height: _size,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: o.bg, width: 1.5),
                     ),
-                  Positioned(
-                    left: shown.length * (_size * 0.66),
-                    child: Container(
-                      width: _size,
-                      height: _size,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: o.text,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: o.bg, width: 1.5),
-                      ),
-                      child: Icon(
-                        Iconsax.arrow_down_1_copy,
-                        size: 10,
-                        color: o.bg,
-                      ),
-                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: shown[i],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(width: Space.md),
-            // Flexible, because this row already starts indented by the depth
-            // of the sub-thread it stands in for: deep enough in, or at a
-            // large text size, the label is wider than what is left.
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: FontSizes.sm,
-                  fontWeight: Weights.medium,
-                  color: o.textLow,
+                ),
+              Positioned(
+                left: shown.length * (_size * 0.66),
+                child: Container(
+                  width: _size,
+                  height: _size,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: o.text,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: o.bg, width: 1.5),
+                  ),
+                  child: Icon(
+                    Iconsax.arrow_down_1_copy,
+                    size: 10,
+                    color: o.bg,
+                  ),
                 ),
               ),
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: Space.sm),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.sm,
+                fontWeight: Weights.medium,
+                color: o.textLow,
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -688,6 +703,7 @@ class ThreadItem extends StatelessWidget {
     required this.avatar,
     required this.child,
     this.avatarSize = 34,
+    this.avatarWidth,
   });
 
   final int depth;
@@ -696,7 +712,15 @@ class ThreadItem extends StatelessWidget {
   final bool isLastChild;
   final Widget avatar;
   final Widget child;
+
+  /// Height of the leading slot, and what the elbow turns into: the connector
+  /// arrives at its vertical centre.
   final double avatarSize;
+
+  /// Width of that slot when it is not square — a row of overlapping faces is
+  /// wider than one avatar but should still be met by the elbow at the same
+  /// place. Defaults to [avatarSize].
+  final double? avatarWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -723,7 +747,11 @@ class ThreadItem extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(width: avatarSize, height: avatarSize, child: avatar),
+                SizedBox(
+                  width: avatarWidth ?? avatarSize,
+                  height: avatarSize,
+                  child: avatar,
+                ),
                 const SizedBox(width: Space.md),
                 Expanded(child: child),
               ],
