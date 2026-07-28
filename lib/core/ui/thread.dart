@@ -360,69 +360,66 @@ class ThreadMoreReplies extends StatelessWidget {
       onTap: onTap,
       feel: PressFeel.subtle,
       semanticLabel: label,
-      // Padded exactly like a reply row: the gap above sits outside the
-      // painted area, the gap below sits inside it. Padding both sides on the
-      // outside left a double-width break in any rail passing this row.
-      child: Padding(
-        padding: const EdgeInsets.only(top: Space.sm),
-        child: ThreadItem(
-          depth: depth,
-          ancestorRails: ancestorRails,
-          // Nothing is threaded below a marker, and it is the end of its own
-          // run — it *is* the rest of the run.
-          hasChildrenBelow: false,
-          isLastChild: true,
-          avatarSize: _size,
-          avatarWidth: stackWidth(shown.length),
-          avatar: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              for (var i = 0; i < shown.length; i++)
-                Positioned(
-                  left: i * (_size * 0.66),
-                  child: Container(
-                    width: _size,
-                    height: _size,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: o.bg, width: 1.5),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: shown[i],
-                  ),
-                ),
+      child: ThreadItem(
+        depth: depth,
+        ancestorRails: ancestorRails,
+        // Spaced exactly like a reply row, and the gap belongs to the row for
+        // the same reason: a rail passing this marker has to arrive unbroken.
+        topGap: Space.sm,
+        // Nothing is threaded below a marker, and it is the end of its own
+        // run — it *is* the rest of the run.
+        hasChildrenBelow: false,
+        isLastChild: true,
+        avatarSize: _size,
+        avatarWidth: stackWidth(shown.length),
+        avatar: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            for (var i = 0; i < shown.length; i++)
               Positioned(
-                left: shown.length * (_size * 0.66),
+                left: i * (_size * 0.66),
                 child: Container(
                   width: _size,
                   height: _size,
-                  alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: o.text,
                     shape: BoxShape.circle,
                     border: Border.all(color: o.bg, width: 1.5),
                   ),
-                  child: Icon(
-                    Iconsax.arrow_down_1_copy,
-                    size: 10,
-                    color: o.bg,
-                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: shown[i],
                 ),
               ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: Space.sm),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: FontSizes.sm,
-                fontWeight: Weights.medium,
-                color: o.textLow,
+            Positioned(
+              left: shown.length * (_size * 0.66),
+              child: Container(
+                width: _size,
+                height: _size,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: o.text,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: o.bg, width: 1.5),
+                ),
+                child: Icon(
+                  Iconsax.arrow_down_1_copy,
+                  size: 10,
+                  color: o.bg,
+                ),
               ),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: Space.sm),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: FontSizes.sm,
+              fontWeight: Weights.medium,
+              color: o.textLow,
             ),
           ),
         ),
@@ -558,12 +555,13 @@ class ThreadConnectorPlan {
     required bool hasChildrenBelow,
     required bool isLastChild,
     required double avatarSize,
+    double topGap = 0,
   }) {
     // Columns come from the thread's own geometry; only the height at which
     // this row's elbow turns comes from this row's leading element. Taking
     // both from [avatarSize] is what put the marker's rails out of column.
     final centreOf = ThreadGeometry.columnFor;
-    final turnY = avatarSize / 2;
+    final turnY = topGap + avatarSize / 2;
     final ownLeft = ThreadGeometry.indentFor(depth);
 
     // `ancestorRails[level]` says "the ancestor at `level` has a later
@@ -617,7 +615,7 @@ class ThreadConnectorPlan {
       elbow: elbow,
       parentRailBelowX: parentBelow,
       ownRailX: hasChildrenBelow ? centreOf(depth) : null,
-      ownRailTop: avatarSize + Space.xs,
+      ownRailTop: topGap + avatarSize + Space.xs,
     );
   }
 }
@@ -631,6 +629,7 @@ class ThreadConnectorPainter extends CustomPainter {
     required this.isLastChild,
     required this.avatarSize,
     required this.color,
+    this.topGap = 0,
   });
 
   final int depth;
@@ -648,12 +647,17 @@ class ThreadConnectorPainter extends CustomPainter {
   final double avatarSize;
   final Color color;
 
+  /// Blank space above this row's leading element that the strip still covers.
+  /// See [ThreadItem.topGap].
+  final double topGap;
+
   ThreadConnectorPlan get plan => ThreadConnectorPlan.forRow(
         depth: depth,
         ancestorRails: ancestorRails,
         hasChildrenBelow: hasChildrenBelow,
         isLastChild: isLastChild,
         avatarSize: avatarSize,
+        topGap: topGap,
       );
 
   @override
@@ -675,11 +679,13 @@ class ThreadConnectorPainter extends CustomPainter {
     }
 
     if (p.parentRailBelowX case final x?) {
-      canvas.drawLine(
-        Offset(x, p.elbow?.turnY ?? 0),
-        Offset(x, size.height),
-        paint,
-      );
+      // Full height, not from the turn down. This rail is only set when the
+      // parent has another answer still to come, so it runs straight past this
+      // row — and by the height of the turn the elbow's arc has already curved
+      // out of this column, leaving a notch the size of the corner radius in a
+      // line meant to be unbroken. Overlapping the elbow's own vertical costs
+      // nothing: same colour, same column.
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
     }
 
     if (p.ownRailX case final x?) {
@@ -697,6 +703,7 @@ class ThreadConnectorPainter extends CustomPainter {
       old.hasChildrenBelow != hasChildrenBelow ||
       old.isLastChild != isLastChild ||
       old.avatarSize != avatarSize ||
+      old.topGap != topGap ||
       old.color != color ||
       !listEquals(old.ancestorRails, ancestorRails);
 }
@@ -718,6 +725,7 @@ class ThreadItem extends StatelessWidget {
     required this.child,
     this.avatarSize = ThreadGeometry.avatar,
     this.avatarWidth,
+    this.topGap = 0,
   });
 
   final int depth;
@@ -736,6 +744,16 @@ class ThreadItem extends StatelessWidget {
   /// place. Defaults to [avatarSize].
   final double? avatarWidth;
 
+  /// Breathing room above the row, given to the row itself rather than taken
+  /// as an outer `Padding`.
+  ///
+  /// The distinction is the whole point: an outer padding leaves a band the
+  /// connector strip does not cover, and every ancestor rail crossing it comes
+  /// out dashed — one gap per row boundary, all the way down the thread.
+  /// Handing the gap to the row instead lets the strip paint the full height
+  /// while the elbow and the row's own rail shift down to stay on the avatar.
+  final double topGap;
+
   @override
   Widget build(BuildContext context) {
     final o = context.omnia;
@@ -752,12 +770,13 @@ class ThreadItem extends StatelessWidget {
                 hasChildrenBelow: hasChildrenBelow,
                 isLastChild: isLastChild,
                 avatarSize: avatarSize,
+                topGap: topGap,
                 color: o.borderMedium,
               ),
             ),
           ),
           Padding(
-            padding: EdgeInsets.only(left: indent),
+            padding: EdgeInsets.only(left: indent, top: topGap),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
