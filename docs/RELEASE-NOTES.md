@@ -14,19 +14,18 @@ conversations work, plus the fixes that came out of using it.
 
 ## Play Store "What's new"
 
-Paste-ready, under the 500-character limit:
+Paste-ready — 440 characters, inside Play's 500 limit:
 
 ```
 A complete redesign.
 
-• New look — three themes (Light, Dim, Dark), a flat layout with hairlines
-  instead of cards, and new icons throughout.
+• New look — three themes (Light, Dim, Dark), a flat layout, new icons.
 • Conversations — replies thread properly now, with connecting lines,
   unlimited nesting, and long threads folded until you ask for them.
 • React to posts and replies with likes and dislikes.
 • Photos and video open full screen. Posts show link previews.
 • Share a post as a picture.
-• Steadier sign-in, and fixes to ordering, notifications and navigation.
+• Steadier sign-in, plus fixes to ordering and notifications.
 ```
 
 ---
