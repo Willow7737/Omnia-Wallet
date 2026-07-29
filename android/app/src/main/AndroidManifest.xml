@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- Biometric confirmation before signing (local_auth). -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <!-- Show a notification when somebody replies. Runtime-requested on
+         Android 13+; on older releases it is granted at install. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Omnia Wallet"
         android:name="${applicationName}"
@@ -39,6 +42,14 @@
                 <data android:scheme="io.omnia.wallet" android:host="login-callback"/>
             </intent-filter>
         </activity>
+        <!-- Which channel a push lands on when it arrives with the app in
+             the background. Must match the channel PushService creates, or
+             Android files the notification under a default channel the user
+             cannot see in settings. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="omnia_replies" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

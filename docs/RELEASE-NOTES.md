@@ -104,6 +104,37 @@ Replies were a flat list one level deep. They are now a real thread.
 - **Back to top** appears when you are deep in a list and scrolling upward,
   measured in screenfuls rather than a fixed pixel count.
 
+### Notifications
+
+- **A reply now reaches you.** Answer somebody's comment and they get told —
+  in the Notifications tab, and on their lock screen. The notification is
+  written by the database where the reply is written, so it is there whether or
+  not the app was running at the time, and it is the same on every device you
+  sign in on.
+- Reading them on one device clears the badge on the others.
+- Push needs Firebase credentials that only you can create — see
+  [`PUSH.md`](./PUSH.md). Without them the app still builds and runs, and
+  replies still appear in the Notifications tab; they just do not reach the
+  lock screen.
+
+### Appearance
+
+- **The app follows your phone's light/dark setting.** It never did before: an
+  untouched wallet was pinned to Dim regardless of what the device was set to.
+  There is now a **System** option, and it is the default for anyone who has
+  not picked a theme. Choosing Light, Dim or Dark explicitly still overrides
+  the device.
+
+### Your profile
+
+- **Your name and picture belong to your account, not to the handset.** Both
+  used to live only on the device, so removing and re-adding the wallet — even
+  to the same account — came back nameless and faceless. They now travel with
+  the account, and the device keeps a copy so they still show when you are
+  offline.
+- A name or picture you already set is kept and uploaded on first launch, not
+  overwritten.
+
 ### Sign-in
 
 - **You no longer have to tap twice.** The screen stays in a waiting state with a
@@ -151,7 +182,7 @@ Replies were a flat list one level deep. They are now a real thread.
   and the painting — because connector bugs are silent: a rail running to the
   wrong place lays out and paints without a warning. The first two are pure
   functions with their own tests.
-- **262 tests**, up from the low 200s, including measurements and pixel
+- **285 tests**, up from the low 200s, including measurements and pixel
   assertions for the things that render without complaint when wrong.
 - `docs/DESIGN.md` documents the design system and the provenance of each token.
 - `pubspec.lock` is pinned to Flutter 3.35 / Dart 3.9 to match the target
@@ -164,9 +195,12 @@ Replies were a flat list one level deep. They are now a real thread.
 Three things live outside the app. **The first two are required** — the release
 misbehaves without them.
 
-1. **Apply the reactions migrations** if not already applied:
-   `supabase/migrations/20260727000000_news_reactions.sql` and
-   `20260727000100_news_reactions_tuning.sql`. Without them, reacting fails.
+1. **Apply the migrations.** All of those in `supabase/migrations/` — the
+   reactions pair, plus `20260729000000_profile_avatars.sql`,
+   `20260729000100_reply_notifications.sql` and
+   `20260729000200_push_delivery.sql`. *These have already been applied to the
+   live project and the `send-push` function is deployed*; the files are there
+   so a fresh environment can be brought up from the repository.
 
 2. **Set `OMNIA_JWT_SECRET`** in the Supabase Edge Function secrets to exactly
    the value the node verifies with. A mismatch makes the node answer
@@ -174,7 +208,11 @@ misbehaves without them.
    instead of the misleading "Session expired" it used to show. Signing in again
    can never fix it. Watch for a trailing newline when copying the value.
 
-3. **Google consent screen branding** (cosmetic, but visible to every new user).
+3. **Push credentials**, if you want notifications on the lock screen:
+   `android/app/google-services.json` and an FCM service-account secret. Step
+   by step in [`PUSH.md`](./PUSH.md). Everything else works without them.
+
+4. **Google consent screen branding** (cosmetic, but visible to every new user).
    It currently shows the Supabase project host rather than "Omnia". Fix it in
    the Google Cloud console under *APIs & Services → OAuth consent screen* by
    setting the app name and a verified domain — it is not an app-side setting.
@@ -184,9 +222,14 @@ misbehaves without them.
 ## Known limitations
 
 - **The Android release build has not been verified for this release.** The
-  toolchain fix for `share_plus` is in, but there is no Android SDK in the
-  environment these changes were made in, so `flutter build apk` has not been
-  run against them. Build before you ship.
+  toolchain fix for `share_plus` is in, and the Firebase Gradle plugin is
+  applied only when `google-services.json` is present so its absence cannot
+  break the build — but there is no Android SDK in the environment these
+  changes were made in, so `flutter build apk` has not been run against them.
+  Build before you ship.
+- **Push has not been exercised against a real device.** The database half is
+  verified end to end against the live project; the FCM half cannot be until
+  the credentials in `PUSH.md` exist and an APK is installed somewhere.
 - Reply authors are not verified and cannot be — see below.
 
 ---

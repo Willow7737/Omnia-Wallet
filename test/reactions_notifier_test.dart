@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:omnia_wallet/data/reactions.dart';
 import 'package:omnia_wallet/data/supabase_gateway.dart';
+
+import 'support/fake_gateway.dart';
 import 'package:omnia_wallet/state/providers.dart';
 import 'package:omnia_wallet/state/reactions.dart';
 
@@ -244,24 +245,10 @@ class _FakeRepo implements ReactionRepository {
   }
 }
 
-class _FakeGateway implements SupabaseGateway {
-  // Not named `signedIn` — the interface already uses that for its stream.
-  _FakeGateway({required this.authenticated});
-
-  final bool authenticated;
-
-  /// What the backend is pretending to hold.
-  RemoteProfile? profile;
-  final List<({String? displayName, String? avatarUrl})> savedProfiles = [];
-  int uploads = 0;
-  @override
-  bool get isAvailable => true;
-
-  @override
-  bool get isSignedIn => authenticated;
-
-  @override
-  String? get userId => authenticated ? 'uid-1' : null;
+class _FakeGateway extends FakeGatewayBase {
+  // `authenticated` is named that way on the base because the interface
+  // already uses `signedIn` for its stream.
+  _FakeGateway({required super.authenticated});
 
   @override
   String? get userEmail => 'user@example.com';
@@ -289,29 +276,4 @@ class _FakeGateway implements SupabaseGateway {
 
   @override
   Stream<void> tableChanges(String table) => const Stream.empty();
-
-  @override
-  Future<RemoteProfile?> fetchProfile() async => profile;
-
-  @override
-  Future<void> saveProfile({
-    String? displayName,
-    String? avatarUrl,
-    bool clearAvatar = false,
-  }) async {
-    savedProfiles.add((displayName: displayName, avatarUrl: avatarUrl));
-    profile = RemoteProfile(
-      displayName: displayName ?? profile?.displayName,
-      avatarUrl: clearAvatar ? null : (avatarUrl ?? profile?.avatarUrl),
-    );
-  }
-
-  @override
-  Future<String> uploadAvatar({
-    required Uint8List bytes,
-    required String fileExtension,
-  }) async {
-    uploads++;
-    return 'https://example.test/avatars/uid-1/$uploads.$fileExtension';
-  }
 }

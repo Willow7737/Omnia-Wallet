@@ -104,6 +104,7 @@ class _NoticeTile extends ConsumerWidget {
       NoticeType.vote => (Iconsax.chart_2_copy, o.positive),
       NoticeType.wallet => (Iconsax.wallet_copy, o.textMedium),
       NoticeType.news => (Iconsax.global_copy, o.accent),
+      NoticeType.reply => (Iconsax.message_copy, o.accent),
     };
   }
 
@@ -134,6 +135,7 @@ class _NoticeTile extends ConsumerWidget {
             return;
           }
         case NoticeType.news:
+        case NoticeType.reply:
           final post = ref
               .read(newsPostsProvider)
               .valueOrNull

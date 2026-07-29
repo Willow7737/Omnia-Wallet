@@ -7,6 +7,24 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase Cloud Messaging, applied only when its credentials are here.
+//
+// The google-services plugin fails the build outright if google-services.json
+// is missing, which would mean nobody could build the app at all until they
+// had set up a Firebase project. Push is worth having; it is not worth making
+// it impossible to compile without. Absent the file, firebase_core simply
+// fails to initialise at runtime and PushService turns itself off — see
+// docs/PUSH.md.
+val hasFirebaseConfig = file("google-services.json").exists()
+if (hasFirebaseConfig) {
+    apply(plugin = "com.google.gms.google-services")
+} else {
+    logger.lifecycle(
+        "Omnia: android/app/google-services.json not found — building without " +
+            "push notifications. See docs/PUSH.md.",
+    )
+}
+
 // Release upload-signing config, loaded from `android/key.properties`
 // (gitignored — never committed). When the file is absent (e.g. a fresh
 // clone, CI without secrets, or a local debug build) the release build falls

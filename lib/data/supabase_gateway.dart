@@ -80,6 +80,66 @@ abstract class SupabaseGateway {
     required Uint8List bytes,
     required String fileExtension,
   });
+
+  /// Notifications addressed to the signed-in account, newest first.
+  ///
+  /// Empty when signed out: these are written by the database for a specific
+  /// user, so there is nothing to read without a session.
+  Future<List<RemoteNotice>> fetchNotifications({int limit = 50});
+
+  /// Mark every unread notification as read, server-side.
+  Future<void> markNotificationsRead();
+
+  /// Delete every notification for this account.
+  Future<void> clearNotifications();
+
+  /// Record this handset as a delivery address for the signed-in account.
+  ///
+  /// Upserts on the token, so a handset that signs out and back in as somebody
+  /// else moves to the new account rather than notifying both.
+  Future<void> registerDevice({
+    required String token,
+    required String platform,
+  });
+
+  /// Forget this handset — called on sign-out, so a shared device stops
+  /// receiving the previous account's replies.
+  Future<void> unregisterDevice(String token);
+}
+
+/// One row of the `notifications` table.
+class RemoteNotice {
+  const RemoteNotice({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.body,
+    required this.createdAt,
+    required this.read,
+    this.link,
+  });
+
+  final String id;
+  final String kind;
+  final String title;
+  final String body;
+  final DateTime createdAt;
+  final bool read;
+
+  /// A path like `/post/<uuid>`. The trailing segment is the subject.
+  final String? link;
+
+  /// The id at the end of [link], or null.
+  ///
+  /// The table has no subject column, so the route carries it. Parsing it here
+  /// rather than at the call site keeps the one place that knows the shape of
+  /// that string next to the field it comes from.
+  String? get subjectId {
+    final path = link;
+    if (path == null || path.isEmpty) return null;
+    final last = path.split('/').where((s) => s.isNotEmpty).lastOrNull;
+    return (last == null || last.isEmpty) ? null : last;
+  }
 }
 
 /// What the backend holds about a user's presentation.
@@ -341,5 +401,72 @@ class SupabaseFlutterGateway implements SupabaseGateway {
           ),
         );
     return _client.storage.from('avatars').getPublicUrl(path);
+  }
+
+  @override
+  Future<List<RemoteNotice>> fetchNotifications({int limit = 50}) async {
+    if (!_initialized || userId == null) return const [];
+    // No user_id filter: the SELECT policy already restricts this to the
+    // caller's own rows, and repeating it in the query would only mean two
+    // places to keep right.
+    final rows = await _client
+        .from('notifications')
+        .select('id, kind, title, body, link, read_at, created_at')
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return [
+      for (final row in rows)
+        RemoteNotice(
+          id: row['id'] as String,
+          kind: (row['kind'] as String?) ?? 'news',
+          title: (row['title'] as String?) ?? '',
+          body: (row['body'] as String?) ?? '',
+          link: row['link'] as String?,
+          read: row['read_at'] != null,
+          createdAt: DateTime.tryParse(row['created_at'] as String? ?? '')
+                  ?.toLocal() ??
+              DateTime.now(),
+        ),
+    ];
+  }
+
+  @override
+  Future<void> markNotificationsRead() async {
+    final uid = userId;
+    if (!_initialized || uid == null) return;
+    await _client
+        .from('notifications')
+        .update({'read_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('user_id', uid)
+        .isFilter('read_at', null);
+  }
+
+  @override
+  Future<void> clearNotifications() async {
+    final uid = userId;
+    if (!_initialized || uid == null) return;
+    await _client.from('notifications').delete().eq('user_id', uid);
+  }
+
+  @override
+  Future<void> registerDevice({
+    required String token,
+    required String platform,
+  }) async {
+    final uid = userId;
+    if (!_initialized || uid == null) return;
+    await _client.from('device_tokens').upsert({
+      'token': token,
+      'user_id': uid,
+      'platform': platform,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'token');
+  }
+
+  @override
+  Future<void> unregisterDevice(String token) async {
+    if (!_initialized) return;
+    await _client.from('device_tokens').delete().eq('token', token);
   }
 }

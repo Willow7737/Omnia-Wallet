@@ -10,7 +10,9 @@ import 'core/router.dart';
 import 'core/theme.dart';
 import 'data/supabase_gateway.dart';
 import 'features/lock/app_lock_gate.dart';
+import 'state/news.dart';
 import 'state/profile.dart';
+import 'state/push.dart';
 import 'state/providers.dart';
 import 'state/settings.dart';
 
@@ -68,6 +70,9 @@ class _OmniaWalletAppState extends ConsumerState<OmniaWalletApp> {
     // Load a persisted node URL override (if any) after first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       unawaited(ref.read(profileSyncProvider).sync());
+      // Push registers itself and turns itself off when Firebase is absent,
+      // so this is safe on a build with no google-services.json.
+      unawaited(ref.read(pushServiceProvider).start());
       final saved = await ref.read(secureStoreProvider).readNodeUrl();
       if (saved != null && saved.isNotEmpty && mounted) {
         ref.read(nodeUrlProvider.notifier).state = saved;
@@ -82,8 +87,36 @@ class _OmniaWalletAppState extends ConsumerState<OmniaWalletApp> {
     super.dispose();
   }
 
+  /// Open what a tapped notification was about.
+  ///
+  /// The push carries a path (`/post/<id>`) rather than a route the app can
+  /// follow directly, because the post screen takes its subject as an object.
+  /// So the id is resolved against the feed, and a post that has since been
+  /// deleted falls back to the list rather than erroring.
+  Future<void> _openPush(String link) async {
+    final id = link.split('/').where((s) => s.isNotEmpty).lastOrNull;
+    ref.read(pushOpenProvider.notifier).state = null;
+    if (id == null) return;
+
+    try {
+      final posts = await ref.read(newsPostsProvider.future);
+      final post = posts.where((p) => p.id == id).firstOrNull;
+      if (post != null) {
+        _router.push('/post', extra: post);
+        return;
+      }
+    } catch (_) {
+      // Fall through to the list.
+    }
+    _router.go('/news');
+  }
+
   @override
   Widget build(BuildContext context) {
+    ref.listen<String?>(pushOpenProvider, (_, link) {
+      if (link != null && link.isNotEmpty) _openPush(link);
+    });
+
     final themes = OmniaTheme.modeFor(ref.watch(themeProvider));
 
     return MaterialApp.router(

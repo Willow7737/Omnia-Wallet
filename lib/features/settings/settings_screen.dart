@@ -12,6 +12,7 @@ import '../../core/ui/list_row.dart';
 import '../../core/ui/press.dart';
 import '../../core/ui/sheet.dart';
 import '../../state/providers.dart';
+import '../../state/push.dart';
 import '../../state/settings.dart';
 import '../lock/app_lock.dart';
 
@@ -223,6 +224,10 @@ class SettingsScreen extends ConsumerWidget {
     );
     if (!confirmed) return;
 
+    // Before the session goes: a shared handset must stop receiving the
+    // previous account's replies, and after signOut there is no longer a
+    // token to delete the registration with.
+    await ref.read(pushServiceProvider).unregister();
     await ref.read(authRepositoryProvider).logout();
     ref.invalidate(hasWalletProvider);
     ref.invalidate(identityProvider);
