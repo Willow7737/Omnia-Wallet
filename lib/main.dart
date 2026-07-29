@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,7 @@ import 'core/router.dart';
 import 'core/theme.dart';
 import 'data/supabase_gateway.dart';
 import 'features/lock/app_lock_gate.dart';
+import 'state/profile.dart';
 import 'state/providers.dart';
 import 'state/settings.dart';
 
@@ -44,14 +47,27 @@ class _OmniaWalletAppState extends ConsumerState<OmniaWalletApp> {
     return buildRouter(ref, _routerRefresh);
   }
 
+  /// Pulls the account's name and picture down whenever a session appears.
+  StreamSubscription<void>? _profileSub;
+
   @override
   void initState() {
     super.initState();
     // Warm the haptics preference so the very first tap already respects it.
     ref.read(hapticsEnabledProvider);
 
+    // The profile lives on the account, so a launch that already holds a
+    // session reconciles immediately, and a sign-in that arrives later
+    // reconciles then. Without the second, a freshly re-added wallet keeps
+    // showing the identicon until the next cold start.
+    _profileSub = ref
+        .read(supabaseGatewayProvider)
+        .signedIn
+        .listen((_) => ref.read(profileSyncProvider).sync());
+
     // Load a persisted node URL override (if any) after first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      unawaited(ref.read(profileSyncProvider).sync());
       final saved = await ref.read(secureStoreProvider).readNodeUrl();
       if (saved != null && saved.isNotEmpty && mounted) {
         ref.read(nodeUrlProvider.notifier).state = saved;
@@ -61,21 +77,21 @@ class _OmniaWalletAppState extends ConsumerState<OmniaWalletApp> {
 
   @override
   void dispose() {
+    _profileSub?.cancel();
     _routerRefresh.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // The app is explicitly themed rather than following the platform: ALF
-    // ships three themes (Light / Dim / Dark), and the extra "dim" step has no
-    // equivalent in Flutter's two-valued ThemeMode.
-    final theme = OmniaTheme.of(ref.watch(themeProvider));
+    final themes = OmniaTheme.modeFor(ref.watch(themeProvider));
 
     return MaterialApp.router(
       title: 'Omnia Wallet',
       debugShowCheckedModeBanner: false,
-      theme: theme,
+      theme: themes.light,
+      darkTheme: themes.dark,
+      themeMode: themes.mode,
       routerConfig: _router,
       builder: (context, child) {
         // Pin text scaling to a sane band. The balance figure and the tab bar

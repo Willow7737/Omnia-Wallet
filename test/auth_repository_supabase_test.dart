@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:omnia_wallet/core/auth_mode.dart';
@@ -21,6 +22,10 @@ class FakeGateway implements SupabaseGateway {
   bool signedOut = false;
   int tokenCalls = 0;
 
+  /// What the backend is pretending to hold.
+  RemoteProfile? profile;
+  final List<({String? displayName, String? avatarUrl})> savedProfiles = [];
+  int uploads = 0;
   @override
   bool get isAvailable => true;
 
@@ -57,6 +62,31 @@ class FakeGateway implements SupabaseGateway {
 
   @override
   Stream<void> tableChanges(String table) => const Stream.empty();
+
+  @override
+  Future<RemoteProfile?> fetchProfile() async => profile;
+
+  @override
+  Future<void> saveProfile({
+    String? displayName,
+    String? avatarUrl,
+    bool clearAvatar = false,
+  }) async {
+    savedProfiles.add((displayName: displayName, avatarUrl: avatarUrl));
+    profile = RemoteProfile(
+      displayName: displayName ?? profile?.displayName,
+      avatarUrl: clearAvatar ? null : (avatarUrl ?? profile?.avatarUrl),
+    );
+  }
+
+  @override
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String fileExtension,
+  }) async {
+    uploads++;
+    return 'https://example.test/avatars/uid-1/$uploads.$fileExtension';
+  }
 }
 
 void main() {

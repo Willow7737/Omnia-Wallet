@@ -15,7 +15,7 @@ import '../../core/ui/list_row.dart';
 import '../../core/ui/press.dart';
 import '../../core/ui/sheet.dart';
 import '../../core/ui/states.dart';
-import '../../state/avatar.dart';
+import '../../state/profile.dart';
 import '../../state/providers.dart';
 import '../shell/app_shell.dart';
 
@@ -165,9 +165,8 @@ class ProfileScreen extends ConsumerWidget {
 
   Future<void> _changePhoto(BuildContext context, WidgetRef ref) async {
     try {
-      final saved = await pickAndSaveAvatar(ref.read(secureStoreProvider));
+      final saved = await ref.read(profileSyncProvider).pickAvatar();
       if (!saved) return;
-      ref.invalidate(avatarFileProvider);
       Haptics.success();
       if (context.mounted) {
         showOmniaToast(context, message: 'Profile photo updated');
@@ -187,14 +186,19 @@ class ProfileScreen extends ConsumerWidget {
     final name = await showOmniaInput(
       context,
       title: 'Display name',
-      subtitle: 'Shown only on this device.',
+      subtitle: 'Saved to your account, and shown on your replies.',
       initialValue: current,
       hintText: 'How should we call you?',
       textCapitalization: TextCapitalization.words,
     );
     if (name == null) return;
-    await ref.read(secureStoreProvider).saveDisplayName(name);
-    ref.invalidate(displayNameProvider);
+    try {
+      await ref.read(profileSyncProvider).setDisplayName(name);
+    } catch (e) {
+      if (!context.mounted) return;
+      Haptics.error();
+      showOmniaToast(context, message: friendlyError(e).message, error: true);
+    }
   }
 }
 

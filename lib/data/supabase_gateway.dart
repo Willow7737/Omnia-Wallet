@@ -56,6 +56,42 @@ abstract class SupabaseGateway {
   /// down when the last one goes, so a screen nobody is looking at costs
   /// nothing.
   Stream<void> tableChanges(String table);
+
+  /// The signed-in account's stored profile, or null when there is no row or
+  /// nobody is signed in.
+  ///
+  /// Lives on `user_dids` beside the account's DID, which is the same row the
+  /// web interface reads and writes — one profile, whichever way you sign in.
+  Future<RemoteProfile?> fetchProfile();
+
+  /// Write the parts of the profile that were passed.
+  ///
+  /// A field left null is left alone rather than cleared, so setting a name
+  /// cannot silently drop a picture. [clearAvatar] is the explicit way to
+  /// remove one, since null cannot mean both "leave it" and "delete it".
+  Future<void> saveProfile({
+    String? displayName,
+    String? avatarUrl,
+    bool clearAvatar = false,
+  });
+
+  /// Upload profile-picture bytes and return their public URL.
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String fileExtension,
+  });
+}
+
+/// What the backend holds about a user's presentation.
+class RemoteProfile {
+  const RemoteProfile({this.displayName, this.avatarUrl});
+
+  final String? displayName;
+  final String? avatarUrl;
+
+  bool get isEmpty =>
+      (displayName == null || displayName!.isEmpty) &&
+      (avatarUrl == null || avatarUrl!.isEmpty);
 }
 
 /// Production implementation backed by `supabase_flutter`.
@@ -240,5 +276,70 @@ class SupabaseFlutterGateway implements SupabaseGateway {
     );
 
     return controller.stream;
+  }
+
+  @override
+  Future<RemoteProfile?> fetchProfile() async {
+    final uid = userId;
+    if (!_initialized || uid == null) return null;
+    final row = await _client
+        .from('user_dids')
+        .select('display_name, avatar_url')
+        .eq('user_id', uid)
+        .maybeSingle();
+    if (row == null) return null;
+    return RemoteProfile(
+      displayName: row['display_name'] as String?,
+      avatarUrl: row['avatar_url'] as String?,
+    );
+  }
+
+  @override
+  Future<void> saveProfile({
+    String? displayName,
+    String? avatarUrl,
+    bool clearAvatar = false,
+  }) async {
+    final uid = userId;
+    if (!_initialized || uid == null) {
+      throw StateError('Not signed in');
+    }
+    final patch = <String, dynamic>{
+      if (displayName != null) 'display_name': displayName,
+      if (clearAvatar)
+        'avatar_url': null
+      else if (avatarUrl != null)
+        'avatar_url': avatarUrl,
+    };
+    if (patch.isEmpty) return;
+
+    // Update rather than upsert: the row is created at signup and carries the
+    // account's DID, which is immutable and is what mint-node-jwt looks up. An
+    // upsert would have to invent a value for it.
+    await _client.from('user_dids').update(patch).eq('user_id', uid);
+  }
+
+  @override
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String fileExtension,
+  }) async {
+    final uid = userId;
+    if (!_initialized || uid == null) {
+      throw StateError('Not signed in');
+    }
+    // The uid folder is what the storage policy checks; a fresh file name per
+    // upload is what stops a CDN — or Flutter's image cache — from serving the
+    // previous picture after a change.
+    final path = '$uid/${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+    await _client.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: fileExtension == 'png' ? 'image/png' : 'image/jpeg',
+            upsert: true,
+          ),
+        );
+    return _client.storage.from('avatars').getPublicUrl(path);
   }
 }

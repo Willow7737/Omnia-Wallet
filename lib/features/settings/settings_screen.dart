@@ -250,19 +250,19 @@ class _ThemePicker extends ConsumerWidget {
           const EdgeInsets.fromLTRB(Space.lg, Space.xs, Space.lg, Space.xl),
       child: Row(
         children: [
-          for (final name in OmniaThemeName.values) ...[
+          for (final choice in OmniaThemeChoice.values) ...[
             Expanded(
               child: _ThemeSwatch(
-                name: name,
-                selected: name == active,
+                choice: choice,
+                selected: choice == active,
                 onTap: () {
                   Haptics.selection();
-                  ref.read(themeProvider.notifier).set(name);
+                  ref.read(themeProvider.notifier).set(choice);
                 },
               ),
             ),
-            if (name != OmniaThemeName.values.last)
-              const SizedBox(width: Space.md),
+            if (choice != OmniaThemeChoice.values.last)
+              const SizedBox(width: Space.sm),
           ],
         ],
       ),
@@ -272,18 +272,18 @@ class _ThemePicker extends ConsumerWidget {
 
 class _ThemeSwatch extends StatelessWidget {
   const _ThemeSwatch({
-    required this.name,
+    required this.choice,
     required this.selected,
     required this.onTap,
   });
 
-  final OmniaThemeName name;
+  final OmniaThemeChoice choice;
   final bool selected;
   final VoidCallback onTap;
 
   /// The page colour each theme would produce, read straight off the token
   /// tables so the preview can never drift from the real thing.
-  ({Color bg, Color fg, Color muted}) get _preview {
+  static ({Color bg, Color fg, Color muted}) _previewOf(OmniaThemeName name) {
     final palette = switch (name) {
       OmniaThemeName.light => OmniaPalette.defaults,
       OmniaThemeName.dim => OmniaPalette.subdued.invert(),
@@ -296,6 +296,18 @@ class _ThemeSwatch extends StatelessWidget {
     );
   }
 
+  /// System has no colours of its own, so its swatch shows the two it picks
+  /// between — split down the middle. A single flat preview would have had to
+  /// pick one and would then be wrong half the time.
+  ({Color bg, Color fg, Color muted}) get _preview => _previewOf(
+        choice == OmniaThemeChoice.system
+            ? OmniaThemeName.light
+            : choice.resolve(Brightness.light),
+      );
+
+  ({Color bg, Color fg, Color muted})? get _secondPreview =>
+      choice == OmniaThemeChoice.system ? _previewOf(OmniaThemeName.dim) : null;
+
   @override
   Widget build(BuildContext context) {
     final o = context.omnia;
@@ -304,7 +316,7 @@ class _ThemeSwatch extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       haptic: false,
-      semanticLabel: '${name.label} theme',
+      semanticLabel: '${choice.label} theme',
       child: Column(
         children: [
           AnimatedContainer(
@@ -318,35 +330,52 @@ class _ThemeSwatch extends StatelessWidget {
                 width: selected ? 2 : 1,
               ),
             ),
-            padding: const EdgeInsets.all(Space.md),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
               children: [
-                Container(
-                  height: 6,
-                  width: 34,
-                  decoration: BoxDecoration(
-                    color: p.fg,
-                    borderRadius: Radii.rFull,
+                // System's second theme, as a wedge out of the far corner —
+                // the same shape a phone's own "Automatic" swatch uses, and
+                // the quickest way to say "one of these two, depending".
+                if (_secondPreview case final second?)
+                  Positioned.fill(
+                    child: ClipPath(
+                      clipper: const _CornerWedge(),
+                      child: ColoredBox(color: second.bg),
+                    ),
                   ),
-                ),
-                const SizedBox(height: Space.sm),
-                Container(
-                  height: 5,
-                  width: 48,
-                  decoration: BoxDecoration(
-                    color: p.muted,
-                    borderRadius: Radii.rFull,
-                  ),
-                ),
-                const SizedBox(height: Space.xs + 1),
-                Container(
-                  height: 5,
-                  width: 28,
-                  decoration: BoxDecoration(
-                    color: p.muted,
-                    borderRadius: Radii.rFull,
+                Padding(
+                  padding: const EdgeInsets.all(Space.md),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 6,
+                        width: 34,
+                        decoration: BoxDecoration(
+                          color: p.fg,
+                          borderRadius: Radii.rFull,
+                        ),
+                      ),
+                      const SizedBox(height: Space.sm),
+                      Container(
+                        height: 5,
+                        width: 48,
+                        decoration: BoxDecoration(
+                          color: p.muted,
+                          borderRadius: Radii.rFull,
+                        ),
+                      ),
+                      const SizedBox(height: Space.xs + 1),
+                      Container(
+                        height: 5,
+                        width: 28,
+                        decoration: BoxDecoration(
+                          color: p.muted,
+                          borderRadius: Radii.rFull,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -354,7 +383,7 @@ class _ThemeSwatch extends StatelessWidget {
           ),
           const SizedBox(height: Space.sm),
           Text(
-            name.label,
+            choice.label,
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: FontSizes.sm,
@@ -501,4 +530,19 @@ class _VersionFooter extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The lower-right triangle, for the System swatch's second theme.
+class _CornerWedge extends CustomClipper<Path> {
+  const _CornerWedge();
+
+  @override
+  Path getClip(Size size) => Path()
+    ..moveTo(size.width, 0)
+    ..lineTo(size.width, size.height)
+    ..lineTo(0, size.height)
+    ..close();
+
+  @override
+  bool shouldReclip(_CornerWedge oldClipper) => false;
 }

@@ -9,9 +9,14 @@ import 'providers.dart';
 /// Both are read once at launch (before the first frame paints, so the app
 /// never flashes the wrong theme) and written through on every change.
 
-/// The active theme: Light, Dim or Dark. Bluesky offers exactly these three.
-class ThemeController extends StateNotifier<OmniaThemeName> {
-  ThemeController(this._ref) : super(OmniaThemeName.dim) {
+/// The chosen theme: System, Light, Dim or Dark.
+///
+/// This holds what was *asked for*, not what is painted — System has no
+/// colours of its own and resolves against the device's setting at build time,
+/// so a reader who changes their phone from light to dark sees the app follow
+/// without anything here changing.
+class ThemeController extends StateNotifier<OmniaThemeChoice> {
+  ThemeController(this._ref) : super(OmniaThemeChoice.system) {
     _load();
   }
 
@@ -19,17 +24,17 @@ class ThemeController extends StateNotifier<OmniaThemeName> {
 
   Future<void> _load() async {
     final saved = await _ref.read(secureStoreProvider).readTheme();
-    state = OmniaThemeNameX.fromWire(saved);
+    if (mounted) state = OmniaThemeChoiceX.fromWire(saved);
   }
 
-  Future<void> set(OmniaThemeName name) async {
-    if (name == state) return;
-    state = name;
-    await _ref.read(secureStoreProvider).saveTheme(name.wire);
+  Future<void> set(OmniaThemeChoice choice) async {
+    if (choice == state) return;
+    state = choice;
+    await _ref.read(secureStoreProvider).saveTheme(choice.wire);
   }
 }
 
-final themeProvider = StateNotifierProvider<ThemeController, OmniaThemeName>(
+final themeProvider = StateNotifierProvider<ThemeController, OmniaThemeChoice>(
   ThemeController.new,
 );
 
