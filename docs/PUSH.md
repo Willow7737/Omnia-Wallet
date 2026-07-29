@@ -21,6 +21,14 @@ screen. Every piece below fails soft on purpose:
 2. **Add app → Android.** The package name must be exactly `com.omnia.wallet`.
 3. Download `google-services.json` and put it at `android/app/google-services.json`.
 
+**SHA fingerprints are not needed for this.** Firebase asks for them, and the
+console nags when they are absent, but they are only required for Firebase
+Auth's Google Sign-In, App Check and Dynamic Links. Cloud Messaging
+authenticates the *server* with the service account in step 2 and the *device*
+with its registration token; neither involves your signing certificate. Omnia's
+Google sign-in goes through Supabase, not Firebase, so it does not need them
+either. Leave the field empty.
+
 `android/app/google-services.json` is gitignored — it is per-project
 configuration, not source. Anyone building a release needs their own copy.
 
@@ -105,6 +113,11 @@ No row at all means step 3 is not done.
 
 ## Notes
 
+- `flutter_local_notifications` requires **core library desugaring**, enabled
+  in `android/app/build.gradle.kts` with a pinned
+  `desugar_jdk_libs:2.1.4`. Without it the build fails at
+  `:app:checkReleaseAarMetadata` — before compiling anything, so the error
+  names the dependency rather than any code.
 - The Android channel id is `omnia_replies` in three places that must agree:
   `AndroidManifest.xml`, `PushService._channelId`, and the `channel_id` in the
   edge function. A mismatch files notifications under a channel the reader
