@@ -28,6 +28,10 @@ plugins {
     // Gradle 8.11.1 wrapper this project already uses.
     id("com.android.application") version "8.9.1" apply false
     id("org.jetbrains.kotlin.android") version "2.1.10" apply false
+    // Firebase. Declared but not applied here — app/build.gradle.kts applies
+    // it only when google-services.json is present, so a clone without
+    // Firebase credentials still builds.
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 include(":app")

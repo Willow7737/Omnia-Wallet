@@ -49,3 +49,8 @@ app.*.map.json
 **/*.jks
 **/*.keystore
 /android/app/upload-keystore.jks
+
+# Firebase per-project configuration, not source. Each build needs its own —
+# see docs/PUSH.md.
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist

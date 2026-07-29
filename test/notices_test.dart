@@ -1,5 +1,7 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'support/fake_gateway.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:omnia_wallet/crypto/secure_store.dart';
 import 'package:omnia_wallet/state/notices.dart';
@@ -23,7 +25,8 @@ void main() {
     });
     when(() => storage.read(key: any(named: 'key')))
         .thenAnswer((inv) async => disk[inv.namedArguments[#key] as String]);
-    notifier = NoticesNotifier(SecureStore(storage));
+    notifier = NoticesNotifier(
+        SecureStore(storage), FakeGatewayBase(authenticated: false));
   });
 
   group('NoticesNotifier', () {
@@ -38,7 +41,8 @@ void main() {
       expect(notifier.unread, 2);
 
       // Persisted round-trip: a fresh notifier loads the same feed.
-      final reloaded = NoticesNotifier(SecureStore(storage));
+      final reloaded = NoticesNotifier(
+          SecureStore(storage), FakeGatewayBase(authenticated: false));
       await Future<void>.delayed(Duration.zero);
       expect(reloaded.state.length, 2);
       expect(reloaded.state.first.type, NoticeType.vote);
@@ -70,7 +74,8 @@ void main() {
 
     test('corrupt persisted JSON is ignored', () async {
       disk['omnia.wallet.notices'] = 'not-json{';
-      final n = NoticesNotifier(SecureStore(storage));
+      final n = NoticesNotifier(
+          SecureStore(storage), FakeGatewayBase(authenticated: false));
       await Future<void>.delayed(Duration.zero);
       expect(n.state, isEmpty);
     });

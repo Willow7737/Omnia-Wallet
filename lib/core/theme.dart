@@ -167,6 +167,39 @@ class OmniaTheme {
         OmniaThemeName.dark => dark(),
       };
 
+  /// The `theme` / `darkTheme` / `themeMode` triple a [choice] needs.
+  ///
+  /// ALF ships three themes where `ThemeMode` has two slots, so the pair is
+  /// filled in per choice rather than mapped across. An explicit choice pins
+  /// *both* slots to the same theme, so the device's setting cannot swap it;
+  /// System fills them differently and lets Flutter pick — which is what makes
+  /// the app track the phone live, with no listener of ours to keep in step.
+  static ({ThemeData light, ThemeData dark, ThemeMode mode}) modeFor(
+    OmniaThemeChoice choice,
+  ) =>
+      switch (choice) {
+        OmniaThemeChoice.system => (
+            light: light(),
+            dark: dim(),
+            mode: ThemeMode.system
+          ),
+        OmniaThemeChoice.light => (
+            light: light(),
+            dark: light(),
+            mode: ThemeMode.light
+          ),
+        OmniaThemeChoice.dim => (
+            light: dim(),
+            dark: dim(),
+            mode: ThemeMode.dark
+          ),
+        OmniaThemeChoice.dark => (
+            light: dark(),
+            dark: dark(),
+            mode: ThemeMode.dark
+          ),
+      };
+
   static ThemeData light() =>
       _build(OmniaPalette.defaults, Brightness.light, isDark: false);
 

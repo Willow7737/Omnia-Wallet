@@ -1,4 +1,7 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:omnia_wallet/core/config.dart';
@@ -152,6 +155,182 @@ void main() {
       // the middle of whatever it is pointing at.
       expect(marker.elbow!.turnY, 9);
       expect(reply.elbow!.turnY, 17);
+    });
+  });
+
+  group('rails run unbroken', () {
+    testWidgets('consecutive rows leave no unpainted band between them',
+        (tester) async {
+      // Each row used to take its breathing room as an outer padding, so the
+      // connector strip started 8pt below the row's top. An ancestor rail
+      // crossing that band simply was not painted, and a thread three deep
+      // came out as a dashed line — one gap per row boundary.
+      await pump(tester, [
+        r('a'),
+        r('a1', parent: 'a'),
+        r('a2', parent: 'a1'),
+        r('b', parent: 'a'),
+      ]);
+      for (var i = 0; i < 3; i++) {
+        final more = find.text('Show replies');
+        if (more.evaluate().isEmpty) break;
+        await tester.tap(more.first);
+        await tester.pump(const Duration(milliseconds: 300));
+      }
+
+      final strips = tester
+          .widgetList<CustomPaint>(find.byWidgetPredicate(
+            (w) => w is CustomPaint && w.painter is ThreadConnectorPainter,
+          ))
+          .toList();
+      expect(strips.length, greaterThan(2));
+
+      final rects = tester
+          .renderObjectList<RenderBox>(find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is ThreadConnectorPainter,
+      ))
+          .map((box) {
+        final top = box.localToGlobal(Offset.zero).dy;
+        return (top: top, bottom: top + box.size.height);
+      }).toList()
+        ..sort((a, b) => a.top.compareTo(b.top));
+
+      for (var i = 1; i < rects.length; i++) {
+        expect(
+          rects[i].top,
+          lessThanOrEqualTo(rects[i - 1].bottom + 0.01),
+          reason: 'a ${rects[i].top - rects[i - 1].bottom}pt band between rows '
+              '${i - 1} and $i is never painted, so any rail crossing it '
+              'breaks',
+        );
+      }
+    });
+
+    testWidgets("a passing parent's rail is painted for the whole row",
+        (tester) async {
+      // The elbow's arc curves out of the parent's column partway down, so
+      // starting the continuing rail at the turn left a notch the size of the
+      // corner radius in a line that runs straight past.
+      const key = ValueKey('strip');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: OmniaTheme.light(),
+          home: Scaffold(
+            body: RepaintBoundary(
+              key: key,
+              child: SizedBox(
+                width: 200,
+                child: ThreadItem(
+                  depth: 1,
+                  ancestorRails: const [false],
+                  hasChildrenBelow: false,
+                  // Not the last child, so the parent's rail passes this row.
+                  isLastChild: false,
+                  topGap: Space.sm,
+                  avatar: const SizedBox(width: 34, height: 34),
+                  child: const SizedBox(height: 60),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final image = await tester.runAsync(
+        () => (tester.renderObject(find.byKey(key)) as RenderRepaintBoundary)
+            .toImage(),
+      );
+      final data = await tester.runAsync(
+        () => image!.toByteData(format: ui.ImageByteFormat.rawRgba),
+      );
+      final pixels = data!.buffer.asUint8List();
+      final width = image!.width;
+      int channel(int x, int y, int c) => pixels[(y * width + x) * 4 + c];
+
+      // Compare against the same scanline well clear of any connector rather
+      // than against transparency: the Scaffold paints an opaque background,
+      // so every pixel has full alpha and an alpha test would pass on a blank
+      // image.
+      const clear = 150;
+      bool inked(int x, int y) => [0, 1, 2]
+          .any((c) => (channel(x, y, c) - channel(clear, y, c)).abs() > 12);
+
+      // Walk the parent's column down the height of the avatar and the turn,
+      // which is where the arc leaves the column. Below that both the old and
+      // new code draw the same line.
+      final x = ThreadGeometry.columnFor(0).round();
+      var longestGap = 0;
+      var gap = 0;
+      for (var y = 0; y < (Space.sm + ThreadGeometry.avatar).round(); y++) {
+        gap = inked(x, y) ? 0 : gap + 1;
+        if (gap > longestGap) longestGap = gap;
+      }
+      expect(longestGap, lessThanOrEqualTo(2),
+          reason: 'a ${longestGap}px break in a rail that runs straight past');
+    });
+
+    test("a passing parent rail is not notched by its child's elbow", () async {
+      // The elbow's path leaves the parent's column at `turnY - radius` to
+      // make its curve. Starting the continuation at `turnY` therefore left a
+      // hole one radius tall in a rail that runs straight past this row —
+      // invisible to any assertion on the plan, because both pieces are
+      // present and correct. Only the pixels show it.
+      const size = Size(160, 90);
+      final recorder = ui.PictureRecorder();
+      ThreadConnectorPainter(
+        depth: 1,
+        ancestorRails: const [false],
+        hasChildrenBelow: false,
+        // A middle child: the parent has another answer still to come.
+        isLastChild: false,
+        avatarSize: ThreadGeometry.avatar,
+        topGap: Space.sm,
+        color: const Color(0xFF000000),
+      ).paint(Canvas(recorder), size);
+      final image = await recorder
+          .endRecording()
+          .toImage(size.width.toInt(), size.height.toInt());
+      final data = await image.toByteData();
+
+      final x = ThreadGeometry.columnFor(0).round();
+      int alphaAt(int y) =>
+          data!.getUint8(((y * size.width.toInt()) + x) * 4 + 3);
+
+      final blank = [
+        for (var y = 0; y < size.height.toInt(); y++)
+          if (alphaAt(y) < 20) y,
+      ];
+      expect(
+        blank,
+        isEmpty,
+        reason: 'the parent rail has holes at y=$blank, so it reads as a '
+            'dashed line rather than one that carries on past this reply',
+      );
+    });
+
+    test('a row given a top gap moves its elbow down to keep it on the avatar',
+        () {
+      // The gap has to shift what the strip draws, not just what it lays out,
+      // or the elbow arrives above the face it is pointing at.
+      ThreadConnectorPlan planWith(double gap) => ThreadConnectorPlan.forRow(
+            depth: 1,
+            ancestorRails: const [false],
+            hasChildrenBelow: true,
+            isLastChild: true,
+            avatarSize: ThreadGeometry.avatar,
+            topGap: gap,
+          );
+
+      final flush = planWith(0);
+      final gapped = planWith(Space.sm);
+
+      expect(gapped.elbow!.turnY, flush.elbow!.turnY + Space.sm);
+      expect(gapped.ownRailTop, flush.ownRailTop + Space.sm);
+      // Columns are unaffected — a vertical nudge must not move anything
+      // sideways.
+      expect(gapped.elbow!.x, flush.elbow!.x);
+      expect(gapped.ownRailX, flush.ownRailX);
     });
   });
 

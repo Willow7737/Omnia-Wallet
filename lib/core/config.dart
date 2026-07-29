@@ -175,6 +175,7 @@ class AppConfig {
   static const String kAppLockKey = 'omnia.wallet.app_lock';
   static const String kContactsKey = 'omnia.wallet.contacts';
   static const String kDisplayNameKey = 'omnia.wallet.display_name';
+  static const String kAvatarUrlKey = 'omnia.wallet.avatar_url';
   static const String kAuthModeKey = 'omnia.wallet.auth_mode';
   static const String kSupabaseDidKey = 'omnia.wallet.supabase_did';
   static const String kNoticesKey = 'omnia.wallet.notices';

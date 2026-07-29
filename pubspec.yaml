@@ -62,6 +62,15 @@ dependencies:
   # supabase_flutter's OAuth flow; declared because this app imports it.
   url_launcher: ^6.3.0
 
+  # Push notifications. Firebase is only reachable when android/app/
+  # google-services.json exists — see docs/PUSH.md. Without it the app still
+  # builds and runs; push simply stays off.
+  firebase_core: ^3.6.0
+  firebase_messaging: ^15.1.3
+  # Shows a notification while the app is in the foreground, which FCM does
+  # not do on Android by design.
+  flutter_local_notifications: ^18.0.1
+
   # Formatting
   intl: ^0.19.0
 

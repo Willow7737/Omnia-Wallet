@@ -151,10 +151,14 @@ class _ReplyRow extends ConsumerWidget {
     );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.lg, Space.sm, Space.lg, 0),
+      padding: const EdgeInsets.symmetric(horizontal: Space.lg),
       child: ThreadItem(
         depth: row.depth,
         ancestorRails: row.ancestorRails,
+        // The gap above the row belongs to the row, not around it: taken as
+        // an outer padding it left a band the connector strip never covered,
+        // and every ancestor rail crossing it came out dashed.
+        topGap: Space.sm,
         hasChildrenBelow: row.hasChildrenBelow,
         isLastChild: row.isLastChild,
         avatar: ClipOval(

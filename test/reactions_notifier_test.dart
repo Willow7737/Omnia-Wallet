@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:omnia_wallet/data/reactions.dart';
 import 'package:omnia_wallet/data/supabase_gateway.dart';
+
+import 'support/fake_gateway.dart';
 import 'package:omnia_wallet/state/providers.dart';
 import 'package:omnia_wallet/state/reactions.dart';
 
@@ -243,20 +245,10 @@ class _FakeRepo implements ReactionRepository {
   }
 }
 
-class _FakeGateway implements SupabaseGateway {
-  // Not named `signedIn` — the interface already uses that for its stream.
-  _FakeGateway({required this.authenticated});
-
-  final bool authenticated;
-
-  @override
-  bool get isAvailable => true;
-
-  @override
-  bool get isSignedIn => authenticated;
-
-  @override
-  String? get userId => authenticated ? 'uid-1' : null;
+class _FakeGateway extends FakeGatewayBase {
+  // `authenticated` is named that way on the base because the interface
+  // already uses `signedIn` for its stream.
+  _FakeGateway({required super.authenticated});
 
   @override
   String? get userEmail => 'user@example.com';

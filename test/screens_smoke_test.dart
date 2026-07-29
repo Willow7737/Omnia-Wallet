@@ -247,6 +247,83 @@ void main() {
       expect(dark.primary500, light.primary500);
     });
 
+    test('an untouched wallet follows the device', () {
+      // The reported fault: the app ignored the phone's light/dark setting
+      // entirely. The cause was here — a null preference (which is every
+      // wallet that has never opened Settings) answered Dim, a fixed theme,
+      // instead of deferring.
+      expect(OmniaThemeChoiceX.fromWire(null), OmniaThemeChoice.system);
+      expect(OmniaThemeChoiceX.fromWire(''), OmniaThemeChoice.system);
+      expect(OmniaThemeChoiceX.fromWire('nonsense'), OmniaThemeChoice.system);
+    });
+
+    test('System resolves against the device, the rest ignore it', () {
+      expect(
+        OmniaThemeChoice.system.resolve(Brightness.light),
+        OmniaThemeName.light,
+      );
+      expect(
+        OmniaThemeChoice.system.resolve(Brightness.dark),
+        OmniaThemeName.dim,
+        reason: 'system dark should land on the default dark, not true black',
+      );
+
+      // An explicit choice is an instruction, not a preference: the device
+      // being set the other way must not override it.
+      for (final brightness in Brightness.values) {
+        expect(
+          OmniaThemeChoice.light.resolve(brightness),
+          OmniaThemeName.light,
+        );
+        expect(OmniaThemeChoice.dim.resolve(brightness), OmniaThemeName.dim);
+        expect(OmniaThemeChoice.dark.resolve(brightness), OmniaThemeName.dark);
+      }
+    });
+
+    test('every choice survives a round trip through storage', () {
+      for (final choice in OmniaThemeChoice.values) {
+        expect(OmniaThemeChoiceX.fromWire(choice.wire), choice);
+      }
+    });
+
+    testWidgets('a System wallet repaints when the device flips',
+        (tester) async {
+      // The end of the chain, not the enum: it is MaterialApp that resolves
+      // ThemeMode against the platform, so this is the only assertion that
+      // actually says the app follows the phone.
+      Widget app(OmniaThemeChoice choice, Brightness platform) {
+        final themes = OmniaTheme.modeFor(choice);
+        return MediaQuery(
+          data: MediaQueryData(platformBrightness: platform),
+          child: MaterialApp(
+            theme: themes.light,
+            darkTheme: themes.dark,
+            themeMode: themes.mode,
+            home: Builder(
+              builder: (context) => Text(
+                context.omnia.isDark ? 'dark' : 'light',
+                textDirection: TextDirection.ltr,
+              ),
+            ),
+          ),
+        );
+      }
+
+      await tester.pumpWidget(app(OmniaThemeChoice.system, Brightness.light));
+      expect(find.text('light'), findsOneWidget);
+
+      await tester.pumpWidget(app(OmniaThemeChoice.system, Brightness.dark));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('dark'), findsOneWidget,
+          reason: 'the device went dark and the app stayed light');
+
+      // And an explicit choice holds against the device.
+      await tester.pumpWidget(app(OmniaThemeChoice.light, Brightness.dark));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.text('light'), findsOneWidget,
+          reason: 'an explicit Light was overridden by the device');
+    });
+
     test('page background and body text always differ', () {
       for (final name in OmniaThemeName.values) {
         final o = OmniaTheme.of(name).extension<OmniaColors>()!;

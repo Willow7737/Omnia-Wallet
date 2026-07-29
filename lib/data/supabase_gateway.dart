@@ -56,6 +56,102 @@ abstract class SupabaseGateway {
   /// down when the last one goes, so a screen nobody is looking at costs
   /// nothing.
   Stream<void> tableChanges(String table);
+
+  /// The signed-in account's stored profile, or null when there is no row or
+  /// nobody is signed in.
+  ///
+  /// Lives on `user_dids` beside the account's DID, which is the same row the
+  /// web interface reads and writes — one profile, whichever way you sign in.
+  Future<RemoteProfile?> fetchProfile();
+
+  /// Write the parts of the profile that were passed.
+  ///
+  /// A field left null is left alone rather than cleared, so setting a name
+  /// cannot silently drop a picture. [clearAvatar] is the explicit way to
+  /// remove one, since null cannot mean both "leave it" and "delete it".
+  Future<void> saveProfile({
+    String? displayName,
+    String? avatarUrl,
+    bool clearAvatar = false,
+  });
+
+  /// Upload profile-picture bytes and return their public URL.
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String fileExtension,
+  });
+
+  /// Notifications addressed to the signed-in account, newest first.
+  ///
+  /// Empty when signed out: these are written by the database for a specific
+  /// user, so there is nothing to read without a session.
+  Future<List<RemoteNotice>> fetchNotifications({int limit = 50});
+
+  /// Mark every unread notification as read, server-side.
+  Future<void> markNotificationsRead();
+
+  /// Delete every notification for this account.
+  Future<void> clearNotifications();
+
+  /// Record this handset as a delivery address for the signed-in account.
+  ///
+  /// Upserts on the token, so a handset that signs out and back in as somebody
+  /// else moves to the new account rather than notifying both.
+  Future<void> registerDevice({
+    required String token,
+    required String platform,
+  });
+
+  /// Forget this handset — called on sign-out, so a shared device stops
+  /// receiving the previous account's replies.
+  Future<void> unregisterDevice(String token);
+}
+
+/// One row of the `notifications` table.
+class RemoteNotice {
+  const RemoteNotice({
+    required this.id,
+    required this.kind,
+    required this.title,
+    required this.body,
+    required this.createdAt,
+    required this.read,
+    this.link,
+  });
+
+  final String id;
+  final String kind;
+  final String title;
+  final String body;
+  final DateTime createdAt;
+  final bool read;
+
+  /// A path like `/post/<uuid>`. The trailing segment is the subject.
+  final String? link;
+
+  /// The id at the end of [link], or null.
+  ///
+  /// The table has no subject column, so the route carries it. Parsing it here
+  /// rather than at the call site keeps the one place that knows the shape of
+  /// that string next to the field it comes from.
+  String? get subjectId {
+    final path = link;
+    if (path == null || path.isEmpty) return null;
+    final last = path.split('/').where((s) => s.isNotEmpty).lastOrNull;
+    return (last == null || last.isEmpty) ? null : last;
+  }
+}
+
+/// What the backend holds about a user's presentation.
+class RemoteProfile {
+  const RemoteProfile({this.displayName, this.avatarUrl});
+
+  final String? displayName;
+  final String? avatarUrl;
+
+  bool get isEmpty =>
+      (displayName == null || displayName!.isEmpty) &&
+      (avatarUrl == null || avatarUrl!.isEmpty);
 }
 
 /// Production implementation backed by `supabase_flutter`.
@@ -240,5 +336,137 @@ class SupabaseFlutterGateway implements SupabaseGateway {
     );
 
     return controller.stream;
+  }
+
+  @override
+  Future<RemoteProfile?> fetchProfile() async {
+    final uid = userId;
+    if (!_initialized || uid == null) return null;
+    final row = await _client
+        .from('user_dids')
+        .select('display_name, avatar_url')
+        .eq('user_id', uid)
+        .maybeSingle();
+    if (row == null) return null;
+    return RemoteProfile(
+      displayName: row['display_name'] as String?,
+      avatarUrl: row['avatar_url'] as String?,
+    );
+  }
+
+  @override
+  Future<void> saveProfile({
+    String? displayName,
+    String? avatarUrl,
+    bool clearAvatar = false,
+  }) async {
+    final uid = userId;
+    if (!_initialized || uid == null) {
+      throw StateError('Not signed in');
+    }
+    final patch = <String, dynamic>{
+      if (displayName != null) 'display_name': displayName,
+      if (clearAvatar)
+        'avatar_url': null
+      else if (avatarUrl != null)
+        'avatar_url': avatarUrl,
+    };
+    if (patch.isEmpty) return;
+
+    // Update rather than upsert: the row is created at signup and carries the
+    // account's DID, which is immutable and is what mint-node-jwt looks up. An
+    // upsert would have to invent a value for it.
+    await _client.from('user_dids').update(patch).eq('user_id', uid);
+  }
+
+  @override
+  Future<String> uploadAvatar({
+    required Uint8List bytes,
+    required String fileExtension,
+  }) async {
+    final uid = userId;
+    if (!_initialized || uid == null) {
+      throw StateError('Not signed in');
+    }
+    // The uid folder is what the storage policy checks; a fresh file name per
+    // upload is what stops a CDN — or Flutter's image cache — from serving the
+    // previous picture after a change.
+    final path = '$uid/${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
+    await _client.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(
+            contentType: fileExtension == 'png' ? 'image/png' : 'image/jpeg',
+            upsert: true,
+          ),
+        );
+    return _client.storage.from('avatars').getPublicUrl(path);
+  }
+
+  @override
+  Future<List<RemoteNotice>> fetchNotifications({int limit = 50}) async {
+    if (!_initialized || userId == null) return const [];
+    // No user_id filter: the SELECT policy already restricts this to the
+    // caller's own rows, and repeating it in the query would only mean two
+    // places to keep right.
+    final rows = await _client
+        .from('notifications')
+        .select('id, kind, title, body, link, read_at, created_at')
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return [
+      for (final row in rows)
+        RemoteNotice(
+          id: row['id'] as String,
+          kind: (row['kind'] as String?) ?? 'news',
+          title: (row['title'] as String?) ?? '',
+          body: (row['body'] as String?) ?? '',
+          link: row['link'] as String?,
+          read: row['read_at'] != null,
+          createdAt: DateTime.tryParse(row['created_at'] as String? ?? '')
+                  ?.toLocal() ??
+              DateTime.now(),
+        ),
+    ];
+  }
+
+  @override
+  Future<void> markNotificationsRead() async {
+    final uid = userId;
+    if (!_initialized || uid == null) return;
+    await _client
+        .from('notifications')
+        .update({'read_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('user_id', uid)
+        .isFilter('read_at', null);
+  }
+
+  @override
+  Future<void> clearNotifications() async {
+    final uid = userId;
+    if (!_initialized || uid == null) return;
+    await _client.from('notifications').delete().eq('user_id', uid);
+  }
+
+  @override
+  Future<void> registerDevice({
+    required String token,
+    required String platform,
+  }) async {
+    final uid = userId;
+    if (!_initialized || uid == null) return;
+    await _client.from('device_tokens').upsert({
+      'token': token,
+      'user_id': uid,
+      'platform': platform,
+      'updated_at': DateTime.now().toUtc().toIso8601String(),
+    }, onConflict: 'token');
+  }
+
+  @override
+  Future<void> unregisterDevice(String token) async {
+    if (!_initialized) return;
+    await _client.from('device_tokens').delete().eq('token', token);
   }
 }

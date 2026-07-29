@@ -9,12 +9,14 @@ import 'package:omnia_wallet/data/auth_repository.dart';
 import 'package:omnia_wallet/data/mint_jwt_client.dart';
 import 'package:omnia_wallet/data/supabase_gateway.dart';
 
+import 'support/fake_gateway.dart';
+
 class MockStorage extends Mock implements FlutterSecureStorage {}
 
 class MockDio extends Mock implements Dio {}
 
 /// Deterministic in-test stand-in for supabase_flutter.
-class FakeGateway implements SupabaseGateway {
+class FakeGateway extends FakeGatewayBase {
   FakeGateway({this.token = 'supabase-access-token'});
 
   String token;

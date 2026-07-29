@@ -107,7 +107,19 @@ class SecureStore {
   Future<void> saveAvatarPath(String path) async =>
       _storage.write(key: AppConfig.kAvatarPathKey, value: path);
 
-  /// Appearance preference (Light / Dim / Dark). Unset means "dim".
+  /// The remote URL the cached photo at [readAvatarPath] was downloaded from.
+  ///
+  /// Kept so a launch can tell "the backend has a picture we already have"
+  /// from "the backend has a different picture" without re-downloading the
+  /// same bytes every time the app opens.
+  Future<String?> readAvatarUrl() async =>
+      _storage.read(key: AppConfig.kAvatarUrlKey);
+
+  Future<void> saveAvatarUrl(String? url) async => url == null
+      ? _storage.delete(key: AppConfig.kAvatarUrlKey)
+      : _storage.write(key: AppConfig.kAvatarUrlKey, value: url);
+
+  /// Appearance preference. Unset means "follow the device".
   Future<String?> readTheme() async => _storage.read(key: AppConfig.kThemeKey);
 
   Future<void> saveTheme(String name) async =>
@@ -132,5 +144,6 @@ class SecureStore {
     await _storage.delete(key: AppConfig.kNoticesKey);
     await _storage.delete(key: AppConfig.kLastSeenNewsKey);
     await _storage.delete(key: AppConfig.kAvatarPathKey);
+    await _storage.delete(key: AppConfig.kAvatarUrlKey);
   }
 }

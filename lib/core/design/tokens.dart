@@ -366,6 +366,49 @@ extension OmniaThemeNameX on OmniaThemeName {
       };
 }
 
+/// What the reader asked for, as opposed to which palette ends up painted.
+///
+/// [system] is not a fourth set of colours — it defers to the device's own
+/// light/dark setting. Keeping it separate from [OmniaThemeName] is what lets
+/// the app follow the phone while still remembering that the answer to "which
+/// dark?" is a different question from "dark or light?".
+enum OmniaThemeChoice { system, light, dim, dark }
+
+extension OmniaThemeChoiceX on OmniaThemeChoice {
+  String get label => switch (this) {
+        OmniaThemeChoice.system => 'System',
+        OmniaThemeChoice.light => 'Light',
+        OmniaThemeChoice.dim => 'Dim',
+        OmniaThemeChoice.dark => 'Dark',
+      };
+
+  String get wire => name;
+
+  /// Which palette this shows when the device is set to [platform].
+  ///
+  /// System resolves dark to Dim rather than true black: Dim is the default
+  /// dark everywhere else in the app, and true black is a deliberate choice
+  /// for OLED rather than a sensible thing to hand somebody automatically.
+  OmniaThemeName resolve(Brightness platform) => switch (this) {
+        OmniaThemeChoice.system => platform == Brightness.dark
+            ? OmniaThemeName.dim
+            : OmniaThemeName.light,
+        OmniaThemeChoice.light => OmniaThemeName.light,
+        OmniaThemeChoice.dim => OmniaThemeName.dim,
+        OmniaThemeChoice.dark => OmniaThemeName.dark,
+      };
+
+  /// Anything unrecognised — including the null of a wallet that has never
+  /// opened Settings — follows the device. The app used to answer that case
+  /// with Dim, which is why it ignored the phone's setting entirely.
+  static OmniaThemeChoice fromWire(String? value) => switch (value) {
+        'light' => OmniaThemeChoice.light,
+        'dim' => OmniaThemeChoice.dim,
+        'dark' => OmniaThemeChoice.dark,
+        _ => OmniaThemeChoice.system,
+      };
+}
+
 /// Whether translucent surfaces actually blur what passes beneath them.
 ///
 /// The header and the tab bar are frosted: a `BackdropFilter` plus a wash of
