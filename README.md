@@ -17,16 +17,40 @@ the finality badges below will not light up against the public endpoint:
 
 - **Balance, send, and transaction history** with per-transaction detail
   including **Lane 0 finality status** and signing provenance
+- **Two assets**: soulbound UBC and a transferable ledger that actually
+  credits the recipient — see below
 - **Governance** — view, vote, and create proposals (quadratic voting)
 - **QR send/receive** with request-amounts, plus an address book
 - **Biometric app lock**, in-app notifications, and a team news feed
   with threaded replies and images
 - Onboarding with BIP39 mnemonic backup / import
+
 [![Flutter](https://img.shields.io/badge/Flutter-3.22+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.4+-0175C2?logo=dart&logoColor=white)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Omnia Wallet** is a secure, self-custodial mobile application built with Flutter & Dart that brings Universal Basic Compute (UBC) to your pocket. Your keys, your identity, your control.
+
+---
+
+## ⚖️ Two assets, and the difference matters
+
+The wallet holds two things that are **not** denominations of one currency:
+
+| | **UBC** | **Transferable ledger** |
+| :-- | :-- | :-- |
+| What it is | Soulbound monthly compute rights | Value that moves between people |
+| Sending it | Burns your quota; the recipient is **not** credited | Debits you, **credits the recipient** |
+| Supply | Resets to your quota each epoch | Conserved by every transfer |
+| Addressed by | `did:omnia:…` | Ed25519 **public key** |
+
+UBC deliberately cannot move between identities — that is what stops
+participation rights from being bought up and concentrated. The financial
+ledger is the other half: value that actually reaches someone.
+
+The Send screen asks which one you are moving, because both outcomes are
+irreversible and they are not the same outcome. Full detail in
+[The two economies](#-the-two-economies) below.
 
 ---
 
@@ -95,8 +119,8 @@ Omnia Wallet puts **your security first**:
 │  └── features/       UI feature modules                       │
 │      ├── onboarding/  # Wallet creation & recovery            │
 │      ├── home/        # Balance & overview                     │
-│      ├── send/        # Send UBC                               │
-│      ├── receive/     # Receive & QR display                      │
+│      ├── send/        # Send UBC or transferable value         │
+│      ├── receive/     # Payment address + QR                   │
 │      ├── history/     # Transaction history                   │
 │      └── settings/    # Configuration & preferences            │
 └─────────────────────────────────────────────────────────────┘
@@ -127,18 +151,29 @@ Challenge/Signature Login Flow:
 - **DID derivation** from public key (`did:omnia:` + SHA-256)
 - **Balance display** with monthly quota and epoch information
 - **Send UBC** with soulbound warning and biometric confirmation
+- **Send transferable value** — pick the asset on the Send screen; the
+  recipient is credited exactly what you are debited
 - **Transaction history** with detailed activity tracking
-- **Receive screen** with own DID as QR code
+- **Receive screen** showing your **payment address** (public key) as a QR,
+  with your DID alongside it as identity
 - **Settings**: Node endpoint configuration, recovery phrase reveal, wallet wipe
-- **QR scanning** for recipient DIDs on Send screen
+- **QR scanning** for recipient addresses on the Send screen
+- **Address book**: save and label recipient DIDs
+- **Governance**: list proposals, cast votes, create proposals (quadratic voting)
 - **App-launch biometric lock** with auto-lock on background
 - **Motion & haptics system**: Shared transitions, press feedback, animated balance
 - **News feed** with protocol updates and governance information
 
 ### 🔜 Upcoming Features
 
-- **Address book**: Save and label recipient DIDs
-- **Governance participation**: List proposals, cast votes, create proposals
+- **Transfer history**: the activity list still shows UBC records only.
+  Financial transfers are recorded on the causal graph (each returns an
+  `event_id`) but are not yet surfaced in-app.
+- **Funding the ledger**: `FinancialOp::Mint` requires a mint authority that
+  is not configured, so transferable balances start at zero. Transfers work;
+  who gets an opening balance is a genesis/governance decision.
+- **Contacts for payment addresses**: contacts store DIDs, so the picker is
+  hidden when sending transferable value.
 - **Multi-account support**: Multiple DIDs from one seed
 - **Push notifications** for incoming activity
 - **Hardware-backed keys** (StrongBox / Secure Enclave)
@@ -237,8 +272,8 @@ omnia-wallet/
 │   └── features/          # UI feature modules
 │       ├── onboarding/    # Wallet creation & recovery
 │       ├── home/          # Main wallet screen
-│       ├── send/          # Send UBC flow
-│       ├── receive/       # Receive & QR display
+│       ├── send/          # Send flow (UBC or transferable)
+│       ├── receive/       # Payment address + QR
 │       ├── history/       # Transaction history
 │       └── settings/      # App settings
 │
@@ -251,9 +286,10 @@ omnia-wallet/
 │   ├── onboarding/        # Onboarding images
 │   └── screenshots/       # App screenshots
 │
-├── test/                  # Tests
-│   ├── crypto/            # Cryptographic tests
-│   └── widgets/           # Widget tests
+├── test/                  # Tests (flat — no subdirectories)
+│   ├── key_manager_test.dart        # DID/Ed25519 vectors
+│   ├── financial_transfer_test.dart # Cross-language vectors vs the node
+│   └── …                            # Widget, state and model tests
 │
 ├── pubspec.yaml           # Flutter dependencies
 ├── README.md              # This file
@@ -273,7 +309,14 @@ flutter analyze
 flutter test
 
 # Run specific test file
-flutter test test/crypto/key_manager_test.dart
+flutter test test/key_manager_test.dart
+```
+
+CI runs `dart format --set-exit-if-changed` **before** analyze, so format
+first or the job fails on whitespace:
+
+```bash
+dart format .
 ```
 
 Tests include:
@@ -281,6 +324,25 @@ Tests include:
 - Ed25519 key generation and signing
 - Wallet state management
 - Widget rendering and interactions
+- **Cross-language agreement with the node** (`test/financial_transfer_test.dart`)
+
+### Cross-language test vectors
+
+The wallet and the node each implement the transfer authorization encoding
+independently, and they interoperate only if their bytes match exactly. A
+divergence would not fail loudly — it would silently produce signatures the
+node rejects, in production only.
+
+So the vectors in `test/financial_transfer_test.dart` are not invented: they
+were produced by running the node's own `signed_transfer_message`
+(`shards/src/financial/ops.rs`) and pasted in verbatim. The test asserts this
+wallet reproduces that exact 107-byte message and the exact 64-byte
+signature. A matching test on the node side
+(`financial_transfer_accepts_the_wallets_exact_payload`) feeds the same
+literals through the real HTTP handler.
+
+Together they pin the whole path: **what the wallet signs is what the node
+accepts.** Change either encoding and one of the two fails.
 
 ---
 
@@ -296,35 +358,85 @@ tag builds the AAB via `.github/workflows/release.yml`.
 
 ---
 
-## 📊 UBC Soulbound Model
+## 📊 The two economies
 
-> ⚠️ **Important**: UBC is currently **soulbound**
+### UBC is soulbound — on purpose
 
-When you "send" UBC in the current implementation:
+When you "send" UBC:
 - Tokens are **burned** from your balance (not transferred)
 - The recipient DID is recorded for provenance
 - The recipient does **NOT** receive the tokens
 - This is a **spend** operation, not a transfer
 
-The Send screen explicitly states this behavior with a prominent warning. Future protocol updates may introduce true P2P transfer semantics.
+This is not a limitation waiting to be fixed. A compute right that cannot be
+bought, sold, or accumulated is what keeps participation from concentrating.
+The Send screen states the behaviour plainly before you confirm.
+
+### The financial ledger does move value
+
+`POST /api/v1/financial/transfer` debits the sender and credits the
+recipient; total supply is unchanged. The wallet signs each transfer
+on-device:
+
+```
+"omnia-financial-transfer:v1" || from(32) || to(32) || amount_le(8) || nonce_le(8)
+```
+
+- **The node holds no spending authority.** It relays the transfer and signs
+  the carrying event, but authority comes from your Ed25519 signature, which
+  every node re-verifies when it applies the event. A node can decline to
+  relay a payment; it cannot forge or alter one.
+- **The domain tag is separate** from the UBC spend prefix
+  (`omnia-transfer-v1`), so neither authorization can be replayed as the
+  other.
+- **Nonces are strictly increasing per sender**, making each authorization
+  single-use — without that, an observed event would be a replayable bearer
+  token. Read `next_nonce` immediately before signing; a stale value is
+  rejected.
+- **Supabase-mode accounts cannot send.** With no on-device key there is
+  nothing to authorize with. That is the security property working, not a
+  gap — there is deliberately no node-attested fallback here, unlike UBC
+  spends.
+
+### Why payment addresses are public keys, not DIDs
+
+A `did:omnia:` is a **truncated SHA-256 of the public key** — a one-way hash.
+The ledger verifies your Ed25519 signature, so it needs the actual verifying
+key, and a DID cannot be converted back into one.
+
+**You cannot be paid to a DID.** Share your payment address (64 hex
+characters, shown on the Receive screen). Anyone holding it can still derive
+your DID from it, so the address gives away nothing extra — and a recipient
+needs no prior contact with any node to be paid.
 
 ---
 
 ## 🔗 API Endpoints
 
+Every path below is one the wallet actually calls — see
+[`lib/data/api_client.dart`](lib/data/api_client.dart).
+
 ### Authentication
-- `POST /api/v1/auth/challenge` - Request authentication challenge
-- `POST /api/v1/auth/login` - Submit signed challenge, receive JWT
+- `POST /api/v1/auth/challenge` — Request authentication challenge
+- `POST /api/v1/auth/login` — Submit signed challenge, receive JWT
+- `POST /api/v1/auth/register` — Register a DID for an externally-minted JWT (Supabase mode)
 
-### Economics
-- `GET /api/v1/economics/balance` - Get current balance
-- `GET /api/v1/economics/history` - Get transaction history
-- `POST /api/v1/economics/send` - Send/spend UBC
+### Economics — soulbound UBC
+- `GET /api/v1/economics/balance/:did` — UBC balance, monthly quota, epoch
+- `GET /api/v1/economics/transfers?limit=N` — Spend history
+- `POST /api/v1/economics/transfer` — Spend (burn) UBC; credits nobody
 
-### Governance (Phase 3)
-- `GET /api/v1/governance/proposals` - List governance proposals
-- `POST /api/v1/governance/vote` - Cast a vote
-- `POST /api/v1/governance/proposals` - Create a proposal
+### Financial — the transferable ledger
+- `GET /api/v1/financial/balance/:pubkey` — Balance and `next_nonce`
+- `POST /api/v1/financial/transfer` — Move value; credits the recipient
+
+### Governance
+- `GET /api/v1/governance/proposals` — List governance proposals
+- `POST /api/v1/governance/proposals` — Create a proposal
+- `POST /api/v1/governance/vote` — Cast a vote
+
+### Node
+- `GET /api/v1/node/info` — Version, peers, protocol version, Lane 0 counters
 
 ---
 
