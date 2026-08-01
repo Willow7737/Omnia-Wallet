@@ -57,7 +57,21 @@ Legend: ✅ done · 🔜 next · ⬜ planned.
 
 Some items need node-side work in `omnia-protocol` before the wallet can consume them:
 
-- Real incoming-transfer semantics (UBC is currently soulbound → "send" burns; a true P2P transfer model would change the send/receive UX)
+- ✅ **Done node-side.** Real P2P transfer semantics now exist: the
+  financial shard's transferable ledger is exposed at
+  `GET /api/v1/financial/balance/:pubkey` and
+  `POST /api/v1/financial/transfer`, authorized by the wallet's own
+  Ed25519 signature. The recipient is credited by exactly what the sender
+  is debited, and total supply is conserved. UBC stays soulbound on
+  purpose — it meters what you may *do*; the financial ledger is what you
+  may *pay*.
+  - ✅ Wallet client layer wired (`KeyManager.financialTransferMessage`,
+    `ApiClient.financialTransfer`, `WalletRepository.sendFinancial`),
+    with cross-language test vectors pinned against the node.
+  - 🔜 **Send/receive UX still targets the UBC path.** Receive must show
+    the public key, not the DID — a `did:omnia:` is a one-way hash and
+    cannot be paid to. Send needs an asset picker (UBC vs. transferable)
+    and balance/nonce handling from the financial endpoints.
 - A push-relay service + device-token registration for notifications
 - Any new read endpoints the wallet surfaces (e.g. per-DID activity feed)
 
