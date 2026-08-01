@@ -5,11 +5,12 @@
 The wallet holds an Ed25519 keypair **on the device** (never a shared secret), derives an Omnia DID from the public key, and authenticates to an Omnia node with a challenge/signature login — or via **Supabase sign-in** (Google/GitHub/email) with node JWTs minted by an edge function (dual-mode auth).
 
 **Shipped in v1**, live against the public testnet node. Note that this node
-currently runs **solo with zero peers** and finalizes nothing — Lane 0 BFT
-finality is measured and real (see the protocol repo's
-[`benchmark-gates.md`](https://github.com/Willow7737/omnia-protocol/blob/main/docs/reference/benchmark-gates.md)),
-but it comes from stress runs on a mesh that is not currently standing, so
-the finality badges below will not light up against the public endpoint:
+is the public ingress of a **standing 3-node geo-distributed validator
+mesh** (Nuremberg / Ashburn / Singapore, 2 peers each), with **Lane 0
+finality working** — so the per-transaction finality badges do light up.
+Canonical Lane 1 height still reads 0 on a quiet network; see
+[`benchmark-gates.md`](https://github.com/Willow7737/omnia-protocol/blob/main/docs/reference/benchmark-gates.md)
+in the protocol repo for the measured numbers.
 
 - **Balance, send, and transaction history** with per-transaction detail
   including **Lane 0 finality status** and signing provenance
