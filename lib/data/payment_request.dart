@@ -13,23 +13,40 @@
 /// soulbound, so a "payment request" is really a *spend* request: it prefills
 /// the sender's Send form; nothing is credited to the recipient.
 class PaymentRequest {
-  const PaymentRequest({required this.did, this.amount});
+  const PaymentRequest({required this.did, this.amount, this.publicKeyHex});
 
   /// Recipient DID (`did:omnia:...`), lower-cased.
   final String did;
 
-  /// Requested amount in UBC, or null if the request is DID-only. Always
+  /// Requested amount, or null if the request is DID-only. Always
   /// positive when present.
   final int? amount;
+
+  /// Recipient's hex-encoded Ed25519 public key, when the request carries
+  /// one (`&pk=`).
+  ///
+  /// **Required to be paid on the financial ledger.** A `did:omnia:` is a
+  /// truncated SHA-256 of this key, so it cannot be reversed back into one
+  /// — a DID-only request can prefill a soulbound UBC spend, but nobody
+  /// can send transferable value to it. Older QR codes predate this field
+  /// and parse with it null.
+  final String? publicKeyHex;
+
+  /// Whether this request can receive a transferable-asset payment.
+  bool get isPayable => publicKeyHex != null;
 
   /// URI scheme for Omnia payment requests.
   static const String scheme = 'omnia';
 
-  /// Encode as an `omnia:` URI. Emits the `?amount=` component only when a
-  /// positive amount is present.
+  /// Encode as an `omnia:` URI. Emits each optional component only when
+  /// it carries a value, so a DID-only request round-trips unchanged.
   String toUri() {
+    final query = <String>[
+      if (amount != null && amount! > 0) 'amount=$amount',
+      if (publicKeyHex != null) 'pk=$publicKeyHex',
+    ];
     final base = '$scheme:$did';
-    return (amount != null && amount! > 0) ? '$base?amount=$amount' : base;
+    return query.isEmpty ? base : '$base?${query.join('&')}';
   }
 
   /// Parse a scanned/pasted payload into a [PaymentRequest].
@@ -52,6 +69,14 @@ class PaymentRequest {
     final parsed = amtMatch != null ? int.tryParse(amtMatch.group(1)!) : null;
     final amount = (parsed != null && parsed > 0) ? parsed : null;
 
-    return PaymentRequest(did: did, amount: amount);
+    // Exactly 64 hex characters — a malformed key is dropped rather than
+    // carried forward, so a corrupted QR degrades to a DID-only request
+    // instead of producing an address that silently fails to be paid.
+    final pkMatch = RegExp(
+      r'[?&]pk=([0-9a-fA-F]{64})(?![0-9a-fA-F])',
+    ).firstMatch(text);
+    final publicKeyHex = pkMatch?.group(1)?.toLowerCase();
+
+    return PaymentRequest(did: did, amount: amount, publicKeyHex: publicKeyHex);
   }
 }

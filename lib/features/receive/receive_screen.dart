@@ -59,22 +59,35 @@ class _RequestView extends StatefulWidget {
 class _RequestViewState extends State<_RequestView> {
   int? _amount;
 
-  /// The QR/share payload. With an amount it's an `omnia:` payment-request
-  /// URI; without one it's the bare DID, so nothing regresses for scanners
-  /// that only understand a plain DID.
+  /// The QR/share payload — an `omnia:` payment-request URI carrying the
+  /// DID, the public key when this wallet has one, and the amount when one
+  /// is requested.
+  ///
+  /// The public key is what makes this address **payable**. A `did:omnia:`
+  /// is a truncated SHA-256 of the key, so a DID-only code can prefill a
+  /// soulbound UBC spend but no transferable value can ever reach it.
+  /// Supabase-mode identities have no on-device key and so fall back to the
+  /// bare DID, exactly as before.
   String get _payload {
     final amount = _amount;
-    return amount == null
-        ? widget.identity.did
-        : PaymentRequest(did: widget.identity.did, amount: amount).toUri();
+    final pk = widget.identity.publicKeyHex;
+    if (amount == null && pk == null) return widget.identity.did;
+    return PaymentRequest(
+      did: widget.identity.did,
+      amount: amount,
+      publicKeyHex: pk,
+    ).toUri();
   }
+
+  /// Whether this identity can actually receive transferable value.
+  bool get _isPayable => widget.identity.publicKeyHex != null;
 
   void _copy() {
     Haptics.selection();
     Clipboard.setData(ClipboardData(text: _payload));
     showOmniaToast(
       context,
-      message: _amount == null ? 'DID copied' : 'Payment request copied',
+      message: _amount == null ? 'Address copied' : 'Payment request copied',
       icon: Iconsax.copy_success_copy,
     );
   }
@@ -179,6 +192,65 @@ class _RequestViewState extends State<_RequestView> {
           const SizedBox(height: Space.lg),
         ],
 
+        // Payment address — the public key, which is what a sender needs to
+        // pay you. Shown above the DID because it is the actionable value;
+        // the DID below it is identity, not an address.
+        if (_isPayable) ...[
+          Text(
+            'Payment address',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: FontSizes.xs,
+              fontWeight: Weights.semiBold,
+              color: o.textLow,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: Space.sm),
+          Pressable(
+            onTap: _copy,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: Space.lg,
+                vertical: Space.md,
+              ),
+              decoration: BoxDecoration(
+                color: o.bg25,
+                borderRadius: Radii.rMd,
+                border: Border.all(color: o.borderLow),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.identity.publicKeyHex!,
+                      textAlign: TextAlign.center,
+                      style: monoStyle(
+                          fontSize: FontSizes.sm,
+                          height: LineHeights.snug,
+                          color: o.textHigh),
+                    ),
+                  ),
+                  const SizedBox(width: Space.sm),
+                  Icon(Iconsax.copy_copy, size: 17, color: o.textLow),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: Space.lg),
+          Text(
+            'Identity',
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontSize: FontSizes.xs,
+              fontWeight: Weights.semiBold,
+              color: o.textLow,
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(height: Space.sm),
+        ],
+
         // The DID itself, monospaced so hex is scannable by eye.
         Pressable(
           onTap: _copy,
@@ -216,7 +288,7 @@ class _RequestViewState extends State<_RequestView> {
           children: [
             Expanded(
               child: OmniaButton(
-                label: amount == null ? 'Copy DID' : 'Copy request',
+                label: amount == null ? 'Copy address' : 'Copy request',
                 icon: Iconsax.copy_copy,
                 expand: true,
                 onPressed: _copy,
