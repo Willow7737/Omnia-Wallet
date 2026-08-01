@@ -129,4 +129,14 @@ class _StubWallet implements WalletRepository {
     required int amount,
   }) =>
       throw UnimplementedError();
+
+  @override
+  Future<FinancialBalance> financialBalance() => throw UnimplementedError();
+
+  @override
+  Future<FinancialTransferResult> sendFinancial({
+    required String toPublicKeyHex,
+    required int amount,
+  }) =>
+      throw UnimplementedError();
 }

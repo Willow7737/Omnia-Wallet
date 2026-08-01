@@ -134,7 +134,7 @@ void main() {
       );
 
       final msg = km.financialTransferMessage(
-        fromPublicKey: Uint8List.fromList(hex.decode(identity.publicKeyHex)),
+        fromPublicKey: Uint8List.fromList(hex.decode(identity.publicKeyHex!)),
         toPublicKey: Uint8List.fromList(List.filled(32, 5)),
         amount: 250,
         nonce: 7,
