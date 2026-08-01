@@ -36,12 +36,33 @@ class SendScreen extends ConsumerStatefulWidget {
   ConsumerState<SendScreen> createState() => _SendScreenState();
 }
 
+/// Which of the wallet's two assets a send moves.
+///
+/// They are genuinely different things, not denominations of one thing, so
+/// the recipient format and the outcome differ with the choice.
+enum SendAsset {
+  /// Soulbound monthly compute rights. Spending burns them; the recipient
+  /// is recorded for provenance but credited nothing. Addressed by DID.
+  ubc,
+
+  /// The transferable ledger asset. The recipient is credited exactly what
+  /// the sender is debited. Addressed by Ed25519 public key, because a
+  /// `did:omnia:` is a one-way hash and cannot be paid to.
+  transferable,
+}
+
 class _SendScreenState extends ConsumerState<SendScreen> {
   final _toDidController = TextEditingController();
   final _amountController = TextEditingController();
   bool _busy = false;
   String? _didError;
   String? _amountError;
+
+  /// Which asset this send moves. Defaults to UBC so the existing flow is
+  /// unchanged for anyone who does not deliberately choose otherwise.
+  SendAsset _asset = SendAsset.ubc;
+
+  bool get _isTransferable => _asset == SendAsset.transferable;
 
   /// Latest known spendable balance, for validation and the remaining hint.
   int? _available;
@@ -73,17 +94,53 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   int get _amount => int.tryParse(_amountController.text.trim()) ?? 0;
   String get _toDid => _toDidController.text.trim();
 
+  /// Whether the recipient field holds a well-formed address for the
+  /// selected asset — a 64-character public key, or a DID.
+  bool get _recipientLooksValid => _isTransferable
+      ? RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(_toDid)
+      : _toDid.startsWith('did:omnia:');
+
   bool get _canSubmit =>
-      _toDid.startsWith('did:omnia:') &&
+      _recipientLooksValid &&
       _amount > 0 &&
       (_available == null || _amount <= _available!);
 
   String? _validateDid() {
-    if (_toDid.isEmpty) return 'Enter a recipient DID';
+    if (_toDid.isEmpty) {
+      return _isTransferable
+          ? 'Enter the recipient\'s payment address'
+          : 'Enter a recipient DID';
+    }
+    if (_isTransferable) {
+      // The most likely mistake is pasting a DID, which cannot be paid to.
+      // Say why rather than just rejecting the format.
+      if (_toDid.startsWith('did:omnia:')) {
+        return 'A DID cannot receive a transfer — it is a hash of the '
+            'recipient\'s key. Ask them for their payment address.';
+      }
+      if (!RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(_toDid)) {
+        return 'A payment address is 64 hexadecimal characters';
+      }
+      return null;
+    }
     if (!_toDid.startsWith('did:omnia:')) {
       return 'A DID must start with did:omnia:';
     }
     return null;
+  }
+
+  /// Switch assets, clearing the recipient because the two address formats
+  /// are not interchangeable — carrying a DID into a transfer would only
+  /// produce a confusing validation error.
+  void _setAsset(SendAsset asset) {
+    if (asset == _asset) return;
+    Haptics.selection();
+    setState(() {
+      _asset = asset;
+      _toDidController.clear();
+      _didError = null;
+      _amountError = null;
+    });
   }
 
   String? _validateAmount() {
@@ -98,7 +155,17 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   /// prefill the amount when the request carried one.
   void _applyRequest(PaymentRequest request) {
     Haptics.selection();
-    _toDidController.text = request.did;
+    // A scanned code that carries a public key can be paid; use it as the
+    // address when sending transferable value. Falling back to the DID
+    // there would produce an address the ledger cannot credit.
+    _toDidController.text =
+        _isTransferable ? (request.publicKeyHex ?? '') : request.did;
+    if (_isTransferable && !request.isPayable) {
+      setState(() {
+        _didError = 'That code only carries a DID, which cannot receive a '
+            'transfer. Ask for a payment address.';
+      });
+    }
     if (request.amount != null) {
       _amountController.text = request.amount.toString();
     }
@@ -151,7 +218,8 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     try {
       if (!await auth.isDeviceSupported()) return true; // no hardware — allow
       return auth.authenticate(
-        localizedReason: 'Confirm to send UBC',
+        localizedReason:
+            _isTransferable ? 'Confirm to send funds' : 'Confirm to send UBC',
         options: const AuthenticationOptions(stickyAuth: true),
       );
     } on PlatformException {
@@ -178,10 +246,17 @@ class _SendScreenState extends ConsumerState<SendScreen> {
       context,
       icon: Iconsax.arrow_up_3_copy,
       title: 'Send ${Fmt.ubc(amount)}?',
-      message: 'This spends the amount from your balance and cannot be undone.',
+      // The two assets do genuinely different things, and the difference is
+      // irreversible, so the confirmation says which one this is.
+      message: _isTransferable
+          ? 'This moves the amount to the recipient and cannot be undone.'
+          : 'This spends the amount from your balance and cannot be undone.',
       confirmLabel: 'Send ${Fmt.ubc(amount)}',
       details: [
-        (label: 'To', value: Fmt.shortDid(toDid)),
+        (
+          label: 'To',
+          value: _isTransferable ? _shortAddress(toDid) : Fmt.shortDid(toDid),
+        ),
         (label: 'Amount', value: Fmt.ubc(amount)),
         if (_available != null)
           (label: 'Remaining', value: Fmt.ubc(_available! - amount)),
@@ -191,6 +266,11 @@ class _SendScreenState extends ConsumerState<SendScreen> {
 
     if (!await _confirmWithBiometrics()) return;
     if (!mounted) return;
+
+    if (_isTransferable) {
+      await _submitTransferable(toDid, amount);
+      return;
+    }
 
     setState(() => _busy = true);
     try {
@@ -233,13 +313,63 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     }
   }
 
+  /// Send on the financial ledger: the recipient is credited exactly what
+  /// this wallet is debited.
+  Future<void> _submitTransferable(String toPublicKeyHex, int amount) async {
+    setState(() => _busy = true);
+    try {
+      final result = await runWithOverlay(
+        context,
+        () => ref.read(walletRepositoryProvider).sendFinancial(
+              toPublicKeyHex: toPublicKeyHex,
+              amount: amount,
+            ),
+        message: 'Sending…',
+      );
+      ref.invalidate(financialBalanceProvider);
+      ref.invalidate(historyProvider);
+
+      await ref.read(noticesProvider.notifier).add(
+            type: NoticeType.sent,
+            title: 'Sent ${Fmt.ubc(result.amount)}',
+            // Unlike a UBC spend, there is a credited recipient to report.
+            body: 'To ${_shortAddress(toPublicKeyHex)} · '
+                'new balance ${Fmt.ubc(result.senderBalance)} · '
+                'signed on-device',
+            subjectId: result.eventId.isEmpty ? null : result.eventId,
+          );
+      if (!mounted) return;
+      Haptics.success();
+      showOmniaToast(
+        context,
+        message: 'Sent ${Fmt.ubc(result.amount)}',
+        icon: Iconsax.tick_circle,
+      );
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      Haptics.error();
+      showOmniaToast(context, message: friendlyError(e).message, error: true);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Abbreviate a 64-character payment address for display.
+  static String _shortAddress(String hex) => hex.length <= 16
+      ? hex
+      : '${hex.substring(0, 8)}…${hex.substring(hex.length - 8)}';
+
   @override
   Widget build(BuildContext context) {
     final o = context.omnia;
-    _available = ref.watch(balanceProvider).valueOrNull?.balance;
+    _available = _isTransferable
+        ? ref.watch(financialBalanceProvider).valueOrNull?.balance
+        : ref.watch(balanceProvider).valueOrNull?.balance;
 
     final did = _toDid;
-    final contact = did.isEmpty
+    // Contacts store DIDs, so they only apply to the UBC path.
+    final contact = (_isTransferable || did.isEmpty)
         ? null
         : ref.watch(contactsProvider).where((c) => c.did == did).firstOrNull;
     final isNewDid = did.startsWith('did:omnia:') && contact == null;
@@ -257,6 +387,8 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: const EdgeInsets.only(bottom: Space.xxl),
                 children: [
+                  _AssetSelector(asset: _asset, onChanged: _setAsset),
+                  const Hairline(),
                   _AmountField(
                     controller: _amountController,
                     available: _available,
@@ -271,8 +403,9 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                     onScan: _scan,
                     onContacts: _pickContact,
                     onPaste: _paste,
+                    isTransferable: _isTransferable,
                   ),
-                  if (isNewDid)
+                  if (isNewDid && !_isTransferable)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(
                         Space.lg,
@@ -293,7 +426,10 @@ class _SendScreenState extends ConsumerState<SendScreen> {
                       ),
                     ),
                   const Hairline(),
-                  const _SoulboundNotice(),
+                  if (_isTransferable)
+                    const _TransferableNotice()
+                  else
+                    const _SoulboundNotice(),
                 ],
               ),
             ),
@@ -446,6 +582,7 @@ class _RecipientField extends StatelessWidget {
     required this.onScan,
     required this.onContacts,
     required this.onPaste,
+    required this.isTransferable,
   });
 
   final TextEditingController controller;
@@ -455,11 +592,16 @@ class _RecipientField extends StatelessWidget {
   final VoidCallback onContacts;
   final VoidCallback onPaste;
 
+  /// Whether the field holds a payment address rather than a DID. Changes
+  /// the label, the hint, and whether the contacts picker is offered —
+  /// contacts store DIDs, which cannot be paid to.
+  final bool isTransferable;
+
   @override
   Widget build(BuildContext context) {
     final o = context.omnia;
     final did = controller.text.trim();
-    final resolved = did.startsWith('did:omnia:');
+    final resolved = isTransferable ? false : did.startsWith('did:omnia:');
     final label = contact?.label ?? '';
 
     return Padding(
@@ -469,7 +611,7 @@ class _RecipientField extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'TO',
+            isTransferable ? 'TO (PAYMENT ADDRESS)' : 'TO',
             style: TextStyle(
               fontFamily: 'Inter',
               fontSize: FontSizes.xs,
@@ -509,7 +651,8 @@ class _RecipientField extends StatelessWidget {
                     focusedBorder: InputBorder.none,
                     errorBorder: InputBorder.none,
                     focusedErrorBorder: InputBorder.none,
-                    hintText: 'did:omnia:…',
+                    hintText:
+                        isTransferable ? '64 hex characters' : 'did:omnia:…',
                     errorText: error,
                   ),
                 ),
@@ -537,11 +680,14 @@ class _RecipientField extends StatelessWidget {
                 label: 'Scan',
                 onTap: onScan,
               ),
-              _RecipientAction(
-                icon: Iconsax.profile_2user_copy,
-                label: 'Contacts',
-                onTap: onContacts,
-              ),
+              // Contacts hold DIDs, so the picker would only ever insert an
+              // address the ledger cannot credit.
+              if (!isTransferable)
+                _RecipientAction(
+                  icon: Iconsax.profile_2user_copy,
+                  label: 'Contacts',
+                  onTap: onContacts,
+                ),
               _RecipientAction(
                 icon: Iconsax.copy_copy,
                 label: 'Paste',
@@ -602,6 +748,141 @@ class _RecipientAction extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Footer
 // ---------------------------------------------------------------------------
+
+/// Chooses which asset the send moves.
+///
+/// Presented as an explicit choice rather than inferred from the address
+/// format: the two have different, irreversible outcomes, and a sender
+/// should know which one they picked before they confirm.
+class _AssetSelector extends StatelessWidget {
+  const _AssetSelector({required this.asset, required this.onChanged});
+
+  final SendAsset asset;
+  final ValueChanged<SendAsset> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding:
+          const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.md),
+      child: Row(
+        children: [
+          Expanded(
+            child: _AssetChip(
+              label: 'UBC',
+              caption: 'Compute rights',
+              selected: asset == SendAsset.ubc,
+              onTap: () => onChanged(SendAsset.ubc),
+            ),
+          ),
+          const SizedBox(width: Space.md),
+          Expanded(
+            child: _AssetChip(
+              label: 'Transfer',
+              caption: 'Sends value',
+              selected: asset == SendAsset.transferable,
+              onTap: () => onChanged(SendAsset.transferable),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssetChip extends StatelessWidget {
+  const _AssetChip({
+    required this.label,
+    required this.caption,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final String caption;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.omnia;
+    return Pressable(
+      onTap: onTap,
+      feel: PressFeel.subtle,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Space.md,
+          vertical: Space.md,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? o.accent.withValues(alpha: 0.12) : o.bg25,
+          borderRadius: Radii.rMd,
+          border: Border.all(
+            color: selected ? o.accent : o.borderLow,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.sm,
+                fontWeight: Weights.semiBold,
+                color: selected ? o.accent : o.textHigh,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              caption,
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.xs,
+                color: o.textLow,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Explains what a transferable send does — the counterpart to
+/// [_SoulboundNotice], and the thing UBC structurally cannot do.
+class _TransferableNotice extends StatelessWidget {
+  const _TransferableNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    final o = context.omnia;
+    return Padding(
+      padding: const EdgeInsets.all(Space.lg),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Iconsax.info_circle_copy, size: 16, color: o.textLow),
+          const SizedBox(width: Space.md - 2),
+          Expanded(
+            child: Text(
+              'This moves real value: the recipient is credited exactly what '
+              'you are debited. Send to their payment address (64 hex '
+              'characters) — a DID is a hash of their key and cannot receive '
+              'a transfer.',
+              style: TextStyle(
+                fontFamily: 'Inter',
+                fontSize: FontSizes.sm,
+                height: LineHeights.relaxed,
+                color: o.textLow,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _SoulboundNotice extends StatelessWidget {
   const _SoulboundNotice();

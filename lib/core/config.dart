@@ -89,6 +89,14 @@ class AppConfig {
   /// login signature can never be replayed as a spend authorization.
   static const String transferMessagePrefix = 'omnia-transfer-v1';
 
+  /// Domain-separation tag for a **financial** transfer authorization —
+  /// the transferable asset, not soulbound UBC. MUST match
+  /// `SIGNED_TRANSFER_DOMAIN` in the node's `shards/src/financial/ops.rs`.
+  ///
+  /// Distinct from [transferMessagePrefix] so an authorization to spend
+  /// UBC can never be replayed to move real balance, and vice versa.
+  static const String financialTransferPrefix = 'omnia-financial-transfer:v1';
+
   // ---- Supabase (Mode B sign-in: Google / GitHub / email) ----
 
   static const String _testnetSupabaseUrl =

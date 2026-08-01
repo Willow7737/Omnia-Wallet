@@ -88,10 +88,75 @@ class KeyManager {
 
   /// Sign an arbitrary message with the private key derived from [seed].
   /// Returns the hex-encoded 64-byte Ed25519 signature.
+  ///
+  /// Uses `codeUnits`, so this is only correct for ASCII messages — which
+  /// every text-protocol message here is. For binary payloads use
+  /// [signBytesHex].
   String signHex(Uint8List seed, String message) {
     final priv = privateKeyFromSeed(seed);
     final sig = ed.sign(priv, Uint8List.fromList(message.codeUnits));
     return hex.encode(sig);
+  }
+
+  /// Sign raw bytes with the private key derived from [seed].
+  /// Returns the hex-encoded 64-byte Ed25519 signature.
+  String signBytesHex(Uint8List seed, Uint8List message) {
+    final priv = privateKeyFromSeed(seed);
+    return hex.encode(ed.sign(priv, message));
+  }
+
+  /// Build the canonical message a wallet signs to authorize a **financial
+  /// transfer** — the transferable asset, not soulbound UBC.
+  ///
+  /// MUST match `signed_transfer_message` in the node's
+  /// `shards/src/financial/ops.rs`:
+  ///
+  /// ```text
+  /// "omnia-financial-transfer:v1" || from(32) || to(32) || amount_le(8) || nonce_le(8)
+  /// ```
+  ///
+  /// Unlike [transferMessage] this is binary and fixed-width: every field
+  /// has a constant size, so no crafted account or amount can forge a
+  /// field boundary and no delimiter is needed. The domain tag keeps a
+  /// signature made for login or a UBC spend from being replayed here.
+  Uint8List financialTransferMessage({
+    required Uint8List fromPublicKey,
+    required Uint8List toPublicKey,
+    required int amount,
+    required int nonce,
+  }) {
+    if (fromPublicKey.length != 32) {
+      throw ArgumentError(
+        'from public key must be 32 bytes, got ${fromPublicKey.length}',
+      );
+    }
+    if (toPublicKey.length != 32) {
+      throw ArgumentError(
+        'to public key must be 32 bytes, got ${toPublicKey.length}',
+      );
+    }
+    final builder = BytesBuilder(copy: false)
+      ..add(AppConfig.financialTransferPrefix.codeUnits)
+      ..add(fromPublicKey)
+      ..add(toPublicKey)
+      ..add(_u64Le(amount))
+      ..add(_u64Le(nonce));
+    return builder.toBytes();
+  }
+
+  /// Encode [value] as a little-endian unsigned 64-bit integer.
+  ///
+  /// Dart ints are 64-bit two's complement on native platforms, so the
+  /// byte pattern matches Rust's `u64::to_le_bytes` for the whole
+  /// non-negative range. Negative values would encode as a huge unsigned
+  /// number rather than failing, so reject them here.
+  Uint8List _u64Le(int value) {
+    if (value < 0) {
+      throw ArgumentError('value must be non-negative, got $value');
+    }
+    final bytes = Uint8List(8);
+    ByteData.view(bytes.buffer).setUint64(0, value, Endian.little);
+    return bytes;
   }
 
   /// Build the canonical message a wallet signs to authorize a transfer

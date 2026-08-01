@@ -44,4 +44,68 @@ class WalletRepository {
       authorization: authorization,
     );
   }
+
+  // ---- Financial ledger — the transferable asset ----
+
+  /// This account's transferable balance.
+  ///
+  /// Separate from [balance], which reports the soulbound UBC quota.
+  /// A wallet holds both: UBC meters what it may *do*, this is what it
+  /// may *pay*.
+  Future<FinancialBalance> financialBalance() async {
+    final session = await _auth.ensureSession();
+    final identity = _auth.identity ?? await _auth.loadIdentity();
+    final publicKeyHex = identity?.publicKeyHex;
+    if (publicKeyHex == null) {
+      // Supabase-mode identities have no key, so they have no account on
+      // the financial ledger — an empty balance, not an error.
+      return FinancialBalance.empty('', session.did);
+    }
+    return _api.getFinancialBalance(publicKeyHex, session.did, session.token);
+  }
+
+  /// Send [amount] to [toPublicKeyHex] — a real transfer: the recipient is
+  /// credited by exactly what this account is debited.
+  ///
+  /// Recipients are identified by Ed25519 public key rather than DID,
+  /// because a `did:omnia:` is a one-way hash of the key and the ledger
+  /// needs the key itself to verify signatures.
+  ///
+  /// The nonce is read immediately before signing rather than passed in:
+  /// the ledger requires strictly increasing per-sender nonces, so a value
+  /// fetched earlier in a session may already be stale.
+  Future<FinancialTransferResult> sendFinancial({
+    required String toPublicKeyHex,
+    required int amount,
+  }) async {
+    final session = await _auth.ensureSession();
+    final current = await financialBalance();
+
+    if (current.publicKeyHex == toPublicKeyHex) {
+      throw ArgumentError('Cannot send to your own account');
+    }
+    if (amount <= 0) {
+      throw ArgumentError('Amount must be greater than zero');
+    }
+    if (amount > current.balance) {
+      throw ArgumentError(
+        'Insufficient balance: have ${current.balance}, need $amount',
+      );
+    }
+
+    final auth = await _auth.authorizeFinancialTransfer(
+      toPublicKeyHex: toPublicKeyHex,
+      amount: amount,
+      nonce: current.nextNonce,
+    );
+
+    return _api.financialTransfer(
+      fromPublicKeyHex: auth.publicKeyHex,
+      toPublicKeyHex: toPublicKeyHex,
+      amount: amount,
+      nonce: current.nextNonce,
+      signatureHex: auth.signatureHex,
+      token: session.token,
+    );
+  }
 }

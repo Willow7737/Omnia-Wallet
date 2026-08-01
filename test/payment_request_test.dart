@@ -60,4 +60,61 @@ void main() {
       expect(PaymentRequest.parse('did:omnia:dead'), isNull); // too short
     });
   });
+
+  group('payment address (pk)', () {
+    const pk =
+        'ed4928c628d1c2c6eae90338905995612959273a5c63f93636c14614ac8737d1';
+
+    test('round-trips a payable request', () {
+      const req = PaymentRequest(did: did, amount: 42, publicKeyHex: pk);
+      final uri = req.toUri();
+      expect(uri, 'omnia:$did?amount=42&pk=$pk');
+
+      final parsed = PaymentRequest.parse(uri)!;
+      expect(parsed.did, did);
+      expect(parsed.amount, 42);
+      expect(parsed.publicKeyHex, pk);
+      expect(parsed.isPayable, isTrue);
+    });
+
+    test('carries the key without an amount', () {
+      const req = PaymentRequest(did: did, publicKeyHex: pk);
+      expect(req.toUri(), 'omnia:$did?pk=$pk');
+      expect(PaymentRequest.parse(req.toUri())!.publicKeyHex, pk);
+    });
+
+    test('a DID-only request is not payable', () {
+      // The whole point of the field: a DID is a one-way hash of the key,
+      // so transferable value can never reach a code that lacks the key.
+      final parsed = PaymentRequest.parse('omnia:$did?amount=5')!;
+      expect(parsed.publicKeyHex, isNull);
+      expect(parsed.isPayable, isFalse);
+    });
+
+    test('older DID-only codes still round-trip unchanged', () {
+      const req = PaymentRequest(did: did, amount: 9);
+      expect(req.toUri(), 'omnia:$did?amount=9');
+      expect(PaymentRequest.parse(req.toUri())!.isPayable, isFalse);
+    });
+
+    test('drops a malformed key rather than carrying it forward', () {
+      // A corrupted QR should degrade to a DID-only request, not produce an
+      // address that silently fails to be credited.
+      expect(PaymentRequest.parse('omnia:$did?pk=abcd')!.publicKeyHex, isNull);
+      expect(
+        PaymentRequest.parse('omnia:$did?pk=${'z' * 64}')!.publicKeyHex,
+        isNull,
+      );
+      // 65 hex chars is not a key either.
+      expect(
+        PaymentRequest.parse('omnia:$did?pk=${'a' * 65}')!.publicKeyHex,
+        isNull,
+      );
+    });
+
+    test('normalises the key to lower case', () {
+      final parsed = PaymentRequest.parse('omnia:$did?pk=${pk.toUpperCase()}')!;
+      expect(parsed.publicKeyHex, pk);
+    });
+  });
 }

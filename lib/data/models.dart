@@ -185,3 +185,97 @@ class Session {
   bool isExpiredWithin(Duration skew) =>
       DateTime.now().add(skew).isAfter(expiresAt);
 }
+
+// ---------------------------------------------------------------------------
+// Financial ledger — the transferable asset
+// ---------------------------------------------------------------------------
+//
+// Distinct from UBC in every way that matters to a user. UBC is a soulbound
+// monthly compute right: sending it burns your quota and credits nobody.
+// These balances genuinely move — the recipient's balance goes up by exactly
+// what the sender's goes down. See `node/src/api/financial.rs`.
+//
+// Accounts here are addressed by Ed25519 public key, not DID: a
+// `did:omnia:` is a truncated SHA-256 of the key, so it cannot be turned
+// back into the verifying key the node needs to check a signature.
+
+/// Response from `GET /api/v1/financial/balance/:pubkey`.
+class FinancialBalance {
+  FinancialBalance({
+    required this.publicKeyHex,
+    required this.did,
+    required this.balance,
+    required this.nextNonce,
+    required this.totalSupply,
+  });
+
+  /// Hex-encoded Ed25519 public key identifying the account.
+  final String publicKeyHex;
+
+  /// DID derived from [publicKeyHex], for display alongside the identity.
+  final String did;
+
+  /// Spendable, transferable balance.
+  final int balance;
+
+  /// The nonce this account's next transfer must use. The node requires
+  /// strictly increasing nonces, so a signature built with a stale value
+  /// is rejected — always refresh this immediately before signing.
+  final int nextNonce;
+
+  /// Total supply across all accounts. A transfer conserves it.
+  final int totalSupply;
+
+  factory FinancialBalance.fromJson(Map<String, dynamic> json) =>
+      FinancialBalance(
+        publicKeyHex: json['public_key'] as String? ?? '',
+        did: json['did'] as String? ?? '',
+        balance: (json['balance'] as num?)?.toInt() ?? 0,
+        nextNonce: (json['next_nonce'] as num?)?.toInt() ?? 1,
+        totalSupply: (json['total_supply'] as num?)?.toInt() ?? 0,
+      );
+
+  /// An account with nothing in it — used when the node has never seen it.
+  factory FinancialBalance.empty(String publicKeyHex, String did) =>
+      FinancialBalance(
+        publicKeyHex: publicKeyHex,
+        did: did,
+        balance: 0,
+        nextNonce: 1,
+        totalSupply: 0,
+      );
+}
+
+/// Response from `POST /api/v1/financial/transfer`.
+class FinancialTransferResult {
+  FinancialTransferResult({
+    required this.status,
+    required this.amount,
+    required this.senderBalance,
+    required this.recipientBalance,
+    required this.eventId,
+  });
+
+  final String status;
+  final int amount;
+
+  /// The sender's balance after the transfer.
+  final int senderBalance;
+
+  /// The recipient's balance after the transfer — the number that makes
+  /// this a transfer rather than a burn.
+  final int recipientBalance;
+
+  /// ID of the causal-graph event carrying the transfer, so the UI can
+  /// link to an independently verifiable receipt.
+  final String eventId;
+
+  factory FinancialTransferResult.fromJson(Map<String, dynamic> json) =>
+      FinancialTransferResult(
+        status: json['status'] as String? ?? 'unknown',
+        amount: (json['amount'] as num?)?.toInt() ?? 0,
+        senderBalance: (json['sender_balance'] as num?)?.toInt() ?? 0,
+        recipientBalance: (json['recipient_balance'] as num?)?.toInt() ?? 0,
+        eventId: json['event_id'] as String? ?? '',
+      );
+}

@@ -79,6 +79,15 @@ final balanceProvider = FutureProvider<Balance>((ref) async {
   return ref.watch(walletRepositoryProvider).balance();
 });
 
+/// Transferable balance on the financial ledger. Invalidated after a send.
+///
+/// Distinct from [balanceProvider], which reports the soulbound UBC quota.
+/// A wallet holds both: UBC meters what you may *do*, this is what you may
+/// *pay*.
+final financialBalanceProvider = FutureProvider<FinancialBalance>((ref) async {
+  return ref.watch(walletRepositoryProvider).financialBalance();
+});
+
 /// Transaction history, **newest first**.
 ///
 /// The node makes no ordering guarantee, so the order is established here
