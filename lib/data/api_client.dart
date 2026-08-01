@@ -153,6 +153,66 @@ class ApiClient {
     return list;
   }
 
+  // ---- Financial ledger (JWT) — the transferable asset ----
+  //
+  // Separate from the economics endpoints above on purpose. Those spend
+  // soulbound UBC and credit nobody; these move value between accounts.
+
+  /// `GET /api/v1/financial/balance/:pubkey`.
+  ///
+  /// An account the node has never seen answers 404 — an empty account,
+  /// not an error, so surface it as a zero balance the way [getBalance]
+  /// does for an unregistered DID.
+  Future<FinancialBalance> getFinancialBalance(
+    String publicKeyHex,
+    String did,
+    String token,
+  ) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/financial/balance/$publicKeyHex',
+        options: _auth(token),
+      );
+      return FinancialBalance.fromJson(res.data!);
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return FinancialBalance.empty(publicKeyHex, did);
+      }
+      rethrow;
+    }
+  }
+
+  /// `POST /api/v1/financial/transfer` — moves value; the recipient is
+  /// credited and total supply is unchanged.
+  ///
+  /// [signatureHex] must be the sender's own Ed25519 signature over
+  /// `KeyManager.financialTransferMessage`. The node never holds spending
+  /// authority: it verifies this signature, records it on the causal
+  /// graph, and every other node re-verifies it. A transfer signed with a
+  /// stale [nonce] is rejected, so read `next_nonce` immediately before
+  /// signing.
+  Future<FinancialTransferResult> financialTransfer({
+    required String fromPublicKeyHex,
+    required String toPublicKeyHex,
+    required int amount,
+    required int nonce,
+    required String signatureHex,
+    required String token,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/financial/transfer',
+      data: {
+        'from': fromPublicKeyHex,
+        'to': toPublicKeyHex,
+        'amount': amount,
+        'nonce': nonce,
+        'signature': signatureHex,
+      },
+      options: _auth(token),
+    );
+    return FinancialTransferResult.fromJson(res.data!);
+  }
+
   // ---- Governance (JWT) ----
 
   /// `GET /api/v1/governance/proposals`.

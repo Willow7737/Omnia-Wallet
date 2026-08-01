@@ -1,5 +1,7 @@
 import 'dart:typed_data';
 
+import 'package:convert/convert.dart';
+
 import '../core/auth_mode.dart';
 import '../core/config.dart';
 import '../crypto/key_manager.dart';
@@ -207,6 +209,53 @@ class AuthRepository {
       publicKeyHex: publicKeyHex,
       nonce: challenge.nonce,
       signatureHex: _keys.signHex(seed, message),
+    );
+  }
+
+  /// Sign a **financial** transfer — the transferable asset, not UBC.
+  ///
+  /// Returns the sender's public key and the hex signature over
+  /// `KeyManager.financialTransferMessage`. Unlike
+  /// [authorizeTransfer], the replay guard is the ledger's own
+  /// strictly-increasing per-sender [nonce] rather than a server-issued
+  /// challenge, so no round trip to `/auth/challenge` is needed — but the
+  /// caller must read `next_nonce` immediately before signing, because a
+  /// stale value is rejected.
+  ///
+  /// Throws if there is no on-device key. Supabase-mode wallets cannot
+  /// move funds: the node never holds spending authority, so an identity
+  /// with no private key has nothing to authorize with. That is a
+  /// deliberate property, not a gap to paper over with a node-attested
+  /// fallback the way UBC spends allow.
+  Future<({String publicKeyHex, String signatureHex})> authorizeFinancialTransfer({
+    required String toPublicKeyHex,
+    required int amount,
+    required int nonce,
+  }) async {
+    if (await authMode() == AuthMode.supabase) {
+      throw StateError(
+        'This account signs in with Supabase and has no on-device key, so it '
+        'cannot authorize a transfer. Import a recovery phrase to send funds.',
+      );
+    }
+
+    final seed = await _store.readSeed();
+    if (seed == null) {
+      throw StateError('No wallet on device — create or import one first');
+    }
+    final identity = _keys.identityFromSeed(seed);
+    final publicKeyHex = identity.publicKeyHex!;
+
+    final toBytes = Uint8List.fromList(hex.decode(toPublicKeyHex));
+    final message = _keys.financialTransferMessage(
+      fromPublicKey: Uint8List.fromList(hex.decode(publicKeyHex)),
+      toPublicKey: toBytes,
+      amount: amount,
+      nonce: nonce,
+    );
+    return (
+      publicKeyHex: publicKeyHex,
+      signatureHex: _keys.signBytesHex(seed, message),
     );
   }
 
