@@ -158,9 +158,8 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     // A scanned code that carries a public key can be paid; use it as the
     // address when sending transferable value. Falling back to the DID
     // there would produce an address the ledger cannot credit.
-    _toDidController.text = _isTransferable
-        ? (request.publicKeyHex ?? '')
-        : request.did;
+    _toDidController.text =
+        _isTransferable ? (request.publicKeyHex ?? '') : request.did;
     if (_isTransferable && !request.isPayable) {
       setState(() {
         _didError = 'That code only carries a DID, which cannot receive a '
@@ -357,8 +356,9 @@ class _SendScreenState extends ConsumerState<SendScreen> {
   }
 
   /// Abbreviate a 64-character payment address for display.
-  static String _shortAddress(String hex) =>
-      hex.length <= 16 ? hex : '${hex.substring(0, 8)}…${hex.substring(hex.length - 8)}';
+  static String _shortAddress(String hex) => hex.length <= 16
+      ? hex
+      : '${hex.substring(0, 8)}…${hex.substring(hex.length - 8)}';
 
   @override
   Widget build(BuildContext context) {
@@ -601,8 +601,7 @@ class _RecipientField extends StatelessWidget {
   Widget build(BuildContext context) {
     final o = context.omnia;
     final did = controller.text.trim();
-    final resolved =
-        isTransferable ? false : did.startsWith('did:omnia:');
+    final resolved = isTransferable ? false : did.startsWith('did:omnia:');
     final label = contact?.label ?? '';
 
     return Padding(
@@ -652,9 +651,8 @@ class _RecipientField extends StatelessWidget {
                     focusedBorder: InputBorder.none,
                     errorBorder: InputBorder.none,
                     focusedErrorBorder: InputBorder.none,
-                    hintText: isTransferable
-                        ? '64 hex characters'
-                        : 'did:omnia:…',
+                    hintText:
+                        isTransferable ? '64 hex characters' : 'did:omnia:…',
                     errorText: error,
                   ),
                 ),
@@ -765,7 +763,8 @@ class _AssetSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.md),
+      padding:
+          const EdgeInsets.fromLTRB(Space.lg, Space.lg, Space.lg, Space.md),
       child: Row(
         children: [
           Expanded(

@@ -20,8 +20,7 @@ void main() {
   group('financial transfer message encoding (must match the node)', () {
     // Generated from the Rust implementation:
     //   from  = [3u8; 32], to = [5u8; 32], amount = 250, nonce = 7
-    const expectedHex =
-        '6f6d6e69612d66696e616e6369616c2d7472616e736665723a7631'
+    const expectedHex = '6f6d6e69612d66696e616e6369616c2d7472616e736665723a7631'
         '0303030303030303030303030303030303030303030303030303030303030303'
         '0505050505050505050505050505050505050505050505050505050505050505'
         'fa00000000000000'
@@ -144,7 +143,8 @@ void main() {
         km.signBytesHex(seed, msg),
         '52fa8d6cb50440b776dbf6d65a6ed1fb589ae07505804248e437f814290812b8'
         '6b8f9203c047c004e291dd27a5669a863ed4e51e6399bf03a5e8c79efd76cd05',
-        reason: 'a signature the node will not accept is worse than no transfer',
+        reason:
+            'a signature the node will not accept is worse than no transfer',
       );
     });
   });

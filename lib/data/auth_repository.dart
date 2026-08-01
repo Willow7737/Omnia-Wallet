@@ -227,7 +227,8 @@ class AuthRepository {
   /// with no private key has nothing to authorize with. That is a
   /// deliberate property, not a gap to paper over with a node-attested
   /// fallback the way UBC spends allow.
-  Future<({String publicKeyHex, String signatureHex})> authorizeFinancialTransfer({
+  Future<({String publicKeyHex, String signatureHex})>
+      authorizeFinancialTransfer({
     required String toPublicKeyHex,
     required int amount,
     required int nonce,
