@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="assets/banner.png" alt="Omnia Wallet Banner" width="100%">
+</div>
+
 # Omnia Wallet
 
 > **Self-custodial mobile wallet for the Omnia Protocol**
