@@ -8,17 +8,19 @@
 // Flow:
 //   1. Client (wallet) sends `Authorization: Bearer <supabase access token>`.
 //   2. This function verifies the token (getUser), looks up the caller's DID in
-//      public.user_dids, and mints an HS256 node JWT { sub: did } signed with
-//      OMNIA_JWT_SECRET — identical to the node's create_token / the interface's
-//      lib/jwt.ts, so the node accepts it.
+//      public.user_dids, and mints an RS256 node JWT { sub: did } signed with
+//      OMNIA_JWT_SIGNING_KEY — matching the node's create_token(), so the node
+//      accepts it.
 //   3. Returns { did, token, expires_in }.
 //
 // Deploy:
 //   supabase functions deploy mint-node-jwt --project-ref <your-ref>
-//   supabase secrets set OMNIA_JWT_SECRET=<same secret the node runs with>
+//   supabase secrets set OMNIA_JWT_SIGNING_KEY=<PEM-encoded RSA private key> \
+//     --project-ref <your-ref>
+//   # Optional: set OMNIA_JWT_KEY_ID if the node uses key rotation.
 //   # SUPABASE_URL and SUPABASE_ANON_KEY are injected automatically.
 //
-// The OMNIA_JWT_SECRET never leaves the server — the wallet only ever sees the
+// The signing key never leaves the server — the wallet only ever sees the
 // resulting short-lived node JWT.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -34,36 +36,60 @@ const corsHeaders = {
 function base64url(bytes: Uint8Array): string {
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(bin)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 function base64urlJson(obj: unknown): string {
   return base64url(new TextEncoder().encode(JSON.stringify(obj)));
 }
 
-async function signHs256(message: string, secret: string): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
+/** Import a PEM-encoded RSA private key into a CryptoKey for RS256 signing. */
+async function importRsaSigningKey(
+  pem: string,
+): Promise<CryptoKey> {
+  // Strip PEM armour and decode to raw bytes.
+  const b64 = pem
+    .replace(/-----BEGIN[^-]+-----/, "")
+    .replace(/-----END[^-]+-----/, "")
+    .replace(/\s/g, "");
+  const raw = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+
+  return crypto.subtle.importKey(
+    "pkcs8",
+    raw,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
     false,
     ["sign"],
   );
-  const sig = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    new TextEncoder().encode(message),
-  );
-  return base64url(new Uint8Array(sig));
 }
 
-async function mintNodeJwt(did: string, secret: string): Promise<string> {
+/** Mint an RS256 JWT with { sub, iat, exp } claims. */
+async function mintNodeJwt(
+  did: string,
+  signingKey: CryptoKey,
+  kid: string | undefined,
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  const header = base64urlJson({ alg: "HS256", typ: "JWT" });
-  const claims = base64urlJson({ sub: did, iat: now, exp: now + TOKEN_TTL_SECONDS });
-  const signingInput = `${header}.${claims}`;
-  const signature = await signHs256(signingInput, secret);
-  return `${signingInput}.${signature}`;
+  const header: Record<string, string> = { alg: "RS256", typ: "JWT" };
+  if (kid) header.kid = kid;
+
+  const headerB64 = base64urlJson(header);
+  const claimsB64 = base64urlJson({
+    sub: did,
+    iat: now,
+    exp: now + TOKEN_TTL_SECONDS,
+  });
+  const signingInput = `${headerB64}.${claimsB64}`;
+
+  const sig = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    signingKey,
+    new TextEncoder().encode(signingInput),
+  );
+  return `${signingInput}.${base64url(new Uint8Array(sig))}`;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -74,11 +100,30 @@ function json(body: unknown, status = 200): Response {
 }
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return json({ error: "method not allowed" }, 405);
+  if (req.method === "OPTIONS")
+    return new Response("ok", { headers: corsHeaders });
+  if (req.method !== "POST")
+    return json({ error: "method not allowed" }, 405);
 
-  const secret = Deno.env.get("OMNIA_JWT_SECRET");
-  if (!secret) return json({ error: "OMNIA_JWT_SECRET not configured" }, 500);
+  const signingKeyPem = Deno.env.get("OMNIA_JWT_SIGNING_KEY");
+  if (!signingKeyPem) {
+    return json(
+      { error: "OMNIA_JWT_SIGNING_KEY not configured" },
+      500,
+    );
+  }
+
+  const kid = Deno.env.get("OMNIA_JWT_KEY_ID")?.trim() || undefined;
+
+  let signingKey: CryptoKey;
+  try {
+    signingKey = await importRsaSigningKey(signingKeyPem);
+  } catch (e) {
+    return json(
+      { error: `failed to parse OMNIA_JWT_SIGNING_KEY: ${e}` },
+      500,
+    );
+  }
 
   const authHeader = req.headers.get("Authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
@@ -93,7 +138,10 @@ Deno.serve(async (req: Request) => {
     { global: { headers: { Authorization: authHeader } } },
   );
 
-  const { data: { user }, error: userErr } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: userErr,
+  } = await supabase.auth.getUser();
   if (userErr || !user) return json({ error: "invalid session" }, 401);
 
   const { data: didRow, error: didErr } = await supabase
@@ -107,6 +155,6 @@ Deno.serve(async (req: Request) => {
   }
 
   const did = didRow.did as string;
-  const token = await mintNodeJwt(did, secret);
+  const token = await mintNodeJwt(did, signingKey, kid);
   return json({ did, token, expires_in: TOKEN_TTL_SECONDS });
 });

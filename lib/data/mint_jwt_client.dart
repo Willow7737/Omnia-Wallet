@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../core/config.dart';
 
-/// Response from the `mint-node-jwt` edge function: a node JWT for the DID
+/// Response from the `mint-node-jwt` edge function: an RS256 node JWT for the DID
 /// linked to the signed-in Supabase account.
 class MintedJwt {
   MintedJwt({required this.did, required this.token, required this.expiresIn});
@@ -19,8 +19,8 @@ class MintedJwt {
 }
 
 /// Calls the Supabase edge function that verifies a Supabase session and
-/// mints a node JWT (Mode B). `OMNIA_JWT_SECRET` never leaves the server —
-/// the wallet only ever holds the short-lived result.
+/// mints an RS256 node JWT (Mode B). `OMNIA_JWT_SIGNING_KEY` never leaves the
+/// server — the wallet only ever holds the short-lived result.
 class MintJwtClient {
   MintJwtClient({String? supabaseUrl, String? anonKey, Dio? dio})
       : _dio = dio ??
