@@ -234,14 +234,25 @@ flutter run --dart-define=OMNIA_NODE_URL=http://localhost:9090
 From the `omnia-protocol` repository:
 
 ```bash
-OMNIA_JWT_SECRET=dev-secret cargo run -p omnia-node
+# Generate an RSA key pair (one-time, reuse the files)
+openssl genrsa -out /tmp/omnia-test.pem 2048
+openssl rsa -in /tmp/omnia-test.pem -pubout -out /tmp/omnia-test-pub.pem
+
+# Start the node with RS256 JWT signing
+OMNIA_JWT_SIGNING_KEY="$(cat /tmp/omnia-test.pem)" \
+OMNIA_JWT_VERIFICATION_KEY="$(cat /tmp/omnia-test-pub.pem)" \
+cargo run -p omnia-node
 ```
 
 The wallet authenticates via challenge/signature flow at:
 - `/api/v1/auth/challenge` - Get authentication challenge
-- `/api/v1/auth/login` - Submit signed challenge for JWT
+- `/api/v1/auth/login` - Submit signed challenge, receive RS256 JWT
 
 All economics endpoints require the JWT obtained from the login flow.
+
+> **Supabase edge function (Mode B)**: If you use Google/GitHub/email sign-in,
+> the `mint-node-jwt` edge function must also be configured with the same
+> `OMNIA_JWT_SIGNING_KEY`. See [docs/dual-mode-auth.md](docs/dual-mode-auth.md).
 
 ---
 
@@ -466,7 +477,7 @@ A shared test vector (`did:omnia:4bb06f8e4e3a7715d201d573d0aa4237` for a 32-byte
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `OMNIA_NODE_URL` | Base URL of Omnia node | Required |
+| `OMNIA_NODE_URL` | Base URL of Omnia node | `https://78.47.43.136.sslip.io` |
 
 ### Runtime Configuration
 
