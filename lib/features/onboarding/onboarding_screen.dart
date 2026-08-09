@@ -38,7 +38,7 @@ class _Slide {
 
 const _slides = [
   _Slide(
-    asset: 'assets/onboarding/onb_wallet.jpg',
+    asset: 'assets/onboarding/onb_wallet.png',
     title: 'Meet your Omnia wallet',
     body: 'Universal Basic Compute, in your pocket. Check your balance, '
         'follow your activity, and carry your identity everywhere.',
@@ -50,13 +50,13 @@ const _slides = [
         'or sign in with the Omnia account you already use on the web.',
   ),
   _Slide(
-    asset: 'assets/onboarding/onb_send.jpg',
+    asset: 'assets/onboarding/onb_send.png',
     title: 'Send. Vote. Take part.',
     body: 'Spend UBC in a couple of taps and have your say on governance '
         'proposals that steer the protocol.',
   ),
   _Slide(
-    asset: 'assets/onboarding/onb_news.jpg',
+    asset: 'assets/onboarding/onb_news.png',
     title: 'Stay in the loop',
     body: 'Transaction alerts and news from the Omnia team keep you close to '
         'where the protocol is heading.',

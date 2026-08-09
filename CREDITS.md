@@ -16,10 +16,10 @@
 
 | Asset | Photo | Author | License |
 |---|---|---|---|
-| `onb_wallet.jpg` | Coin jar | [frankieleon](https://www.flickr.com/photos/armydre2008/5638958705) | CC BY 2.0 |
+| `onb_wallet.png` | Coin jar | [frankieleon](https://www.flickr.com/photos/armydre2008/5638958705) | CC BY 2.0 |
 | `onb_keys.jpg` | Skeleton key & coins still life | [ShebleyCL](https://www.flickr.com/photos/25636851@N03/51840406172) | CC BY 2.0 |
-| `onb_send.jpg` | Paper plane | [garryknight](https://www.flickr.com/photos/8176740@N05/5703519506) | CC BY 2.0 |
-| `onb_news.jpg` | Pink hibiscus | [ahisgett](https://www.flickr.com/photos/37804979@N00/19376470675) | CC BY 2.0 |
+| `onb_send.png` | Paper plane | [garryknight](https://www.flickr.com/photos/8176740@N05/5703519506) | CC BY 2.0 |
+| `onb_news.png` | Pink hibiscus | [ahisgett](https://www.flickr.com/photos/37804979@N00/19376470675) | CC BY 2.0 |
 | news: welcome post | Dried flowers still life | via [Openverse](https://openverse.org) | Public Domain Mark |
 | news: soulbound post | Skeleton key & coins (as above) | ShebleyCL | CC BY 2.0 |
 | news: roadmap post | Network lights | via [Openverse](https://openverse.org) | CC0 |
