@@ -108,4 +108,69 @@ class WalletRepository {
       token: session.token,
     );
   }
+
+  // ---- Ghana mobile-money acquisition and merchant settlement ----
+
+  /// Request a server-generated OMNIA quote. The customer number is used only
+  /// to bind the provider payment context; the node determines all economics.
+  Future<OmniaQuote> requestOmniaQuote({
+    required int ghsAmountPesewas,
+    required String provider,
+    required String customerNumber,
+  }) async {
+    final session = await _auth.ensureSession();
+    return _api.requestOmniaQuote(
+      ghsAmountPesewas: ghsAmountPesewas,
+      provider: provider,
+      customerNumber: customerNumber,
+      token: session.token,
+    );
+  }
+
+  /// Start a mobile-money payment from a signed quote.
+  Future<BuyOmniaResult> buyOmnia({
+    required String quoteId,
+    required String customerNumber,
+  }) async {
+    final session = await _auth.ensureSession();
+    return _api.initiateOmniaPayment(
+      quoteId: quoteId,
+      customerNumber: customerNumber,
+      token: session.token,
+    );
+  }
+
+  /// Fetch the authoritative payment-order state.
+  Future<PaymentOrderStatus> getPaymentOrderStatus({
+    required String orderId,
+  }) async {
+    final session = await _auth.ensureSession();
+    return _api.getPaymentOrderStatus(orderId: orderId, token: session.token);
+  }
+
+  /// Create a merchant GHS-priced OMNIA payment request.
+  Future<MerchantPaymentRequest> createMerchantPaymentRequest({
+    required String merchantId,
+    required int ghsPricePesewas,
+  }) async {
+    final session = await _auth.ensureSession();
+    return _api.createMerchantPaymentRequest(
+      merchantId: merchantId,
+      ghsPricePesewas: ghsPricePesewas,
+      token: session.token,
+    );
+  }
+
+  /// Fetch a merchant receipt after the node confirms settlement.
+  Future<MerchantReceipt> getMerchantReceipt({
+    required String merchantId,
+    required String paymentId,
+  }) async {
+    final session = await _auth.ensureSession();
+    return _api.getMerchantReceipt(
+      merchantId: merchantId,
+      paymentId: paymentId,
+      token: session.token,
+    );
+  }
 }

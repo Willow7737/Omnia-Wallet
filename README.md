@@ -535,3 +535,28 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Repository**: [github.com/Willow7737/Omnia-Wallet](https://github.com/Willow7737/Omnia-Wallet)
 - **Protocol**: [github.com/Willow7737/omnia-protocol](https://github.com/Willow7737/omnia-protocol)
 - **Issues**: Please report bugs and feature requests via GitHub Issues
+
+
+## Ghana mobile-money and merchant payments
+
+The wallet now exposes two separate financial paths alongside the original UBC flow. **UBC is still a non-transferable participation allowance; OMNIA is the transferable native asset.** Buying OMNIA does not imply a fixed GHS redemption promise. The Ghana pilot uses mobile money to distribute existing treasury-funded inventory, and all economic terms remain authoritative at the node.
+
+### Buy OMNIA
+
+The **Buy OMNIA** screen accepts a GHS amount, a Ghana mobile-money number in `+233XXXXXXXXX` form, and one of MTN, Telecel, or AT. It requests a server-signed quote from `POST /api/v1/payment-orders/quote`, displays every disclosure field returned by the quote, and initiates only by sending the `quote_id` to `POST /api/v1/payment-orders/initiate`. The client does not set the rate, fees, OMNIA quantity, expiry, provider role, or success state. After initiation it polls `GET /api/v1/payment-orders/:id` and displays the node's state-machine status until delivery, failure, or refund.
+
+### Pay a merchant
+
+The **Pay merchant** screen scans the Omnia merchant QR payload, shows the GHS price, OMNIA amount, protocol fee, merchant ID, and quote expiry, and requires a valid Ed25519 settlement public key. The wallet signs the transferable OMNIA transfer on-device through the existing financial-ledger repository. A successful client submission means the signed transfer was accepted by the node; merchant confirmation and receipt issuance remain server-side settlement operations.
+
+The wallet uses these authenticated endpoints:
+
+| Endpoint | Wallet use |
+| :--- | :--- |
+| `POST /api/v1/payment-orders/quote` | Request server-generated acquisition terms. |
+| `POST /api/v1/payment-orders/initiate` | Start a quote-bound mobile-money order. |
+| `GET /api/v1/payment-orders/:id` | Poll authoritative order status. |
+| `POST /api/v1/merchants/:id/payment-request` | Merchant-side QR/invoice creation. |
+| `GET /api/v1/merchants/:id/receipt/:payment_id` | Read a confirmed merchant receipt. |
+
+The UI deliberately distinguishes **payment submitted** from **merchant confirmed**. Regulated production mobile-money credentials, provider webhooks, reconciliation, and operational merchant tooling remain deployment prerequisites; the sandbox provider and wallet screens are intended for controlled testnet and pilot validation.

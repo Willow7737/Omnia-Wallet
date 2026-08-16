@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../data/models.dart';
 import '../data/news.dart';
 import '../features/about/about_screen.dart';
+import '../features/buy/buy_omnia_screen.dart';
+import '../features/pay/merchant_pay_screen.dart';
 import '../features/contacts/contacts_screen.dart';
 import '../features/governance/governance_screen.dart';
 import '../features/history/history_screen.dart';
@@ -151,6 +153,16 @@ GoRouter buildRouter(WidgetRef ref, Listenable refresh) {
       ),
 
       // ---- pushed over the shell (root navigator) ----
+      GoRoute(
+        path: '/buy-omnia',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const BuyOmniaScreen()),
+      ),
+      GoRoute(
+        path: '/pay-merchant',
+        parentNavigatorKey: _rootKey,
+        pageBuilder: (_, s) => _push(s, const MerchantPayScreen()),
+      ),
       GoRoute(
         path: '/send',
         parentNavigatorKey: _rootKey,

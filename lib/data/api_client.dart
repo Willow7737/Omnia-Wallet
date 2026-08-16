@@ -213,6 +213,83 @@ class ApiClient {
     return FinancialTransferResult.fromJson(res.data!);
   }
 
+  // ---- Ghana mobile-money acquisition and merchant settlement (JWT) ----
+
+  /// `POST /api/v1/payment-orders/quote` — economic terms are server-generated.
+  Future<OmniaQuote> requestOmniaQuote({
+    required int ghsAmountPesewas,
+    required String provider,
+    required String customerNumber,
+    required String token,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/payment-orders/quote',
+      data: {
+        'customer_number': customerNumber,
+        'ghs_amount_pesewas': ghsAmountPesewas,
+        'provider': provider,
+      },
+      options: _auth(token),
+    );
+    return OmniaQuote.fromJson(res.data!);
+  }
+
+  /// `POST /api/v1/payment-orders/initiate` — consumes a server quote.
+  Future<BuyOmniaResult> initiateOmniaPayment({
+    required String quoteId,
+    required String customerNumber,
+    required String token,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/payment-orders/initiate',
+      data: {
+        'quote_id': quoteId,
+        'customer_number': customerNumber,
+      },
+      options: _auth(token),
+    );
+    return BuyOmniaResult.fromJson(res.data!);
+  }
+
+  /// `GET /api/v1/payment-orders/:id` — authoritative state-machine status.
+  Future<PaymentOrderStatus> getPaymentOrderStatus({
+    required String orderId,
+    required String token,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/api/v1/payment-orders/$orderId',
+      options: _auth(token),
+    );
+    return PaymentOrderStatus.fromJson(res.data!);
+  }
+
+  /// `POST /api/v1/merchants/:id/payment-request` — create a QR/invoice.
+  Future<MerchantPaymentRequest> createMerchantPaymentRequest({
+    required String merchantId,
+    required int ghsPricePesewas,
+    required String token,
+  }) async {
+    final res = await _dio.post<Map<String, dynamic>>(
+      '/api/v1/merchants/$merchantId/payment-request',
+      data: {'ghs_price_pesewas': ghsPricePesewas},
+      options: _auth(token),
+    );
+    return MerchantPaymentRequest.fromJson(res.data!);
+  }
+
+  /// `GET /api/v1/merchants/:id/receipt/:payment_id`.
+  Future<MerchantReceipt> getMerchantReceipt({
+    required String merchantId,
+    required String paymentId,
+    required String token,
+  }) async {
+    final res = await _dio.get<Map<String, dynamic>>(
+      '/api/v1/merchants/$merchantId/receipt/$paymentId',
+      options: _auth(token),
+    );
+    return MerchantReceipt.fromJson(res.data!);
+  }
+
   // ---- Governance (JWT) ----
 
   /// `GET /api/v1/governance/proposals`.

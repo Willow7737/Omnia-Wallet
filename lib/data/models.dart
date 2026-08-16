@@ -279,3 +279,307 @@ class FinancialTransferResult {
         eventId: json['event_id'] as String? ?? '',
       );
 }
+
+
+// ---------------------------------------------------------------------------
+// Ghana mobile-money acquisition and merchant settlement
+// ---------------------------------------------------------------------------
+
+/// A server-signed OMNIA quote. Economic terms are display-only on the client;
+/// the node remains authoritative when the quote is initiated.
+class OmniaQuote {
+  OmniaQuote({
+    required this.quoteId,
+    required this.ghsAmountPesewas,
+    required this.omniaQuantityPlancks,
+    required this.exchangeRate,
+    required this.providerFeePesewas,
+    required this.omniaFeePlancks,
+    required this.spreadBps,
+    required this.estimatedDeliverySeconds,
+    required this.createdAtMs,
+    required this.expiresAtMs,
+    required this.provider,
+    required this.signature,
+    required this.signerPublicKey,
+    required this.disclosureFields,
+    required this.totalGhsCostPesewas,
+    required this.netOmniaPlancks,
+  });
+
+  final String quoteId;
+  final int ghsAmountPesewas;
+  final int omniaQuantityPlancks;
+  final int exchangeRate;
+  final int providerFeePesewas;
+  final int omniaFeePlancks;
+  final int spreadBps;
+  final int estimatedDeliverySeconds;
+  final int createdAtMs;
+  final int expiresAtMs;
+  final String provider;
+  final List<QuoteDisclosure> disclosureFields;
+  final List<int> signature;
+  final List<int> signerPublicKey;
+  final int totalGhsCostPesewas;
+  final int netOmniaPlancks;
+
+  bool isExpired([DateTime? now]) =>
+      (now ?? DateTime.now()).millisecondsSinceEpoch >= expiresAtMs;
+
+  factory OmniaQuote.fromJson(Map<String, dynamic> json) {
+    final quote = (json['quote'] as Map<String, dynamic>?) ?? json;
+    return OmniaQuote(
+      quoteId: quote['quote_id']?.toString() ?? '',
+      ghsAmountPesewas: (quote['ghs_amount'] as num?)?.toInt() ?? 0,
+      omniaQuantityPlancks:
+          (quote['omnia_quantity'] as num?)?.toInt() ?? 0,
+      exchangeRate: (quote['exchange_rate'] as num?)?.toInt() ?? 0,
+      providerFeePesewas:
+          (quote['provider_fee_ghs'] as num?)?.toInt() ?? 0,
+      omniaFeePlancks: (quote['omnia_fee'] as num?)?.toInt() ?? 0,
+      spreadBps: (quote['spread_bps'] as num?)?.toInt() ?? 0,
+      estimatedDeliverySeconds:
+          (quote['estimated_delivery_secs'] as num?)?.toInt() ?? 0,
+      createdAtMs: (quote['created_at_ms'] as num?)?.toInt() ?? 0,
+      expiresAtMs: (quote['expires_at_ms'] as num?)?.toInt() ?? 0,
+      provider: _providerName(quote['provider']),
+      signature: _intList(json['signature']),
+      signerPublicKey: _intList(json['signer_public_key']),
+      disclosureFields: ((json['disclosure_fields'] as List<dynamic>?) ?? [])
+          .whereType<Map<String, dynamic>>()
+          .map(QuoteDisclosure.fromJson)
+          .toList(growable: false),
+      totalGhsCostPesewas:
+          (json['total_ghs_cost_pesewas'] as num?)?.toInt() ??
+              ((quote['ghs_amount'] as num?)?.toInt() ?? 0),
+      netOmniaPlancks: (json['net_omnia_plancks'] as num?)?.toInt() ??
+          ((quote['omnia_quantity'] as num?)?.toInt() ?? 0),
+    );
+  }
+
+  static String _providerName(dynamic value) {
+    if (value is String) return value.toUpperCase();
+    if (value is Map<String, dynamic>) {
+      return value['name']?.toString().toUpperCase() ?? 'MTN';
+    }
+    return value?.toString().split('.').last.toUpperCase() ?? 'MTN';
+  }
+
+  static List<int> _intList(dynamic value) =>
+      (value is List<dynamic> ? value : const [])
+          .whereType<num>()
+          .map((item) => item.toInt())
+          .toList(growable: false);
+}
+
+class QuoteDisclosure {
+  QuoteDisclosure({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  factory QuoteDisclosure.fromJson(Map<String, dynamic> json) => QuoteDisclosure(
+        label: json['label']?.toString() ?? '',
+        value: json['value']?.toString() ?? '',
+      );
+}
+
+/// Authoritative payment-order snapshot returned by the node.
+class PaymentOrderStatus {
+  PaymentOrderStatus({
+    required this.orderId,
+    required this.state,
+    required this.customerRef,
+    required this.recipientRef,
+    required this.ghsAmountPesewas,
+    required this.ghsReceivedPesewas,
+    required this.omniaQuantityPlancks,
+    required this.exchangeRate,
+    required this.providerFeePesewas,
+    required this.omniaFeePlancks,
+    required this.providerName,
+    required this.providerRef,
+    required this.inventoryReservationRef,
+    required this.isTerminal,
+    required this.isEconomicallyDelivered,
+    required this.eventCount,
+    required this.createdAtMs,
+    required this.updatedAtMs,
+    required this.quoteExpiryMs,
+    required this.refundStatus,
+  });
+
+  final String orderId;
+  final String state;
+  final String customerRef;
+  final String recipientRef;
+  final int ghsAmountPesewas;
+  final int? ghsReceivedPesewas;
+  final int omniaQuantityPlancks;
+  final int exchangeRate;
+  final int providerFeePesewas;
+  final int omniaFeePlancks;
+  final String providerName;
+  final String? providerRef;
+  final String? inventoryReservationRef;
+  final bool isTerminal;
+  final bool isEconomicallyDelivered;
+  final int eventCount;
+  final int createdAtMs;
+  final int updatedAtMs;
+  final int quoteExpiryMs;
+  final String refundStatus;
+
+  bool get isSuccessful => state == 'DELIVERED';
+  bool get isFailed => const {
+        'PAYMENT_FAILED',
+        'QUOTE_EXPIRED',
+        'PAYMENT_REVERSED',
+        'RISK_REJECTED',
+        'INVENTORY_UNAVAILABLE',
+        'ALLOCATION_FAILED',
+        'REFUNDED',
+        'CANCELLED',
+      }.contains(state);
+
+  factory PaymentOrderStatus.fromJson(Map<String, dynamic> json) {
+    final order = (json['order'] as Map<String, dynamic>?) ?? json;
+    return PaymentOrderStatus(
+      orderId: order['order_id']?.toString() ?? '',
+      state: order['state']?.toString() ?? 'UNKNOWN',
+      customerRef: order['customer_ref']?.toString() ?? '',
+      recipientRef: order['recipient_ref']?.toString() ?? '',
+      ghsAmountPesewas:
+          (order['ghs_amount_pesewas'] as num?)?.toInt() ?? 0,
+      ghsReceivedPesewas:
+          (order['ghs_received_pesewas'] as num?)?.toInt(),
+      omniaQuantityPlancks:
+          (order['omnia_quantity_plancks'] as num?)?.toInt() ?? 0,
+      exchangeRate: (order['exchange_rate'] as num?)?.toInt() ?? 0,
+      providerFeePesewas:
+          (order['provider_fee_pesewas'] as num?)?.toInt() ?? 0,
+      omniaFeePlancks: (order['omnia_fee_plancks'] as num?)?.toInt() ?? 0,
+      providerName: order['provider_name']?.toString() ?? '',
+      providerRef: order['provider_ref']?.toString(),
+      inventoryReservationRef:
+          order['inventory_reservation_ref']?.toString(),
+      isTerminal: order['is_terminal'] as bool? ?? false,
+      isEconomicallyDelivered:
+          order['is_economically_delivered'] as bool? ?? false,
+      eventCount: (order['event_count'] as num?)?.toInt() ?? 0,
+      createdAtMs: (order['created_at_ms'] as num?)?.toInt() ?? 0,
+      updatedAtMs: (order['updated_at_ms'] as num?)?.toInt() ?? 0,
+      quoteExpiryMs: (order['quote_expiry_ms'] as num?)?.toInt() ?? 0,
+      refundStatus: order['refund_status']?.toString() ?? 'None',
+    );
+  }
+}
+
+class BuyOmniaResult {
+  BuyOmniaResult({required this.order, this.providerRef, this.nextStep});
+
+  final PaymentOrderStatus order;
+  final String? providerRef;
+  final String? nextStep;
+
+  factory BuyOmniaResult.fromJson(Map<String, dynamic> json) => BuyOmniaResult(
+        order: PaymentOrderStatus.fromJson(json),
+        providerRef: json['provider_ref']?.toString(),
+        nextStep: json['next_step']?.toString(),
+      );
+}
+
+class MerchantPaymentRequest {
+  MerchantPaymentRequest({
+    required this.paymentId,
+    required this.merchantId,
+    required this.customerWallet,
+    required this.ghsPricePesewas,
+    required this.omniaAmountPlancks,
+    required this.exchangeRate,
+    required this.quoteExpiryMs,
+    required this.protocolFeePlancks,
+    required this.status,
+    required this.createdAtMs,
+    this.merchantPublicKey,
+    this.qrPayload,
+  });
+
+  final String paymentId;
+  final String merchantId;
+  final String customerWallet;
+  final int ghsPricePesewas;
+  final int omniaAmountPlancks;
+  final int exchangeRate;
+  final int quoteExpiryMs;
+  final int protocolFeePlancks;
+  final String status;
+  final int createdAtMs;
+  final String? merchantPublicKey;
+  final Map<String, dynamic>? qrPayload;
+
+  factory MerchantPaymentRequest.fromJson(Map<String, dynamic> json) {
+    final request =
+        (json['payment_request'] as Map<String, dynamic>?) ?? json;
+    final payload = (json['qr_payload'] as Map<String, dynamic>?) ?? json;
+    return MerchantPaymentRequest(
+      paymentId: request['payment_id']?.toString() ?? payload['payment_id']?.toString() ?? '',
+      merchantId: request['merchant_id']?.toString() ?? payload['merchant_id']?.toString() ?? '',
+      customerWallet: request['customer_wallet']?.toString() ?? '',
+      ghsPricePesewas: (request['ghs_price'] as num?)?.toInt() ??
+          (request['ghs_price_pesewas'] as num?)?.toInt() ??
+          (payload['ghs_price_pesewas'] as num?)?.toInt() ?? 0,
+      omniaAmountPlancks: (request['omnia_amount'] as num?)?.toInt() ??
+          (request['omnia_amount_plancks'] as num?)?.toInt() ??
+          (payload['omnia_amount_plancks'] as num?)?.toInt() ?? 0,
+      exchangeRate: (request['exchange_rate'] as num?)?.toInt() ?? 0,
+      quoteExpiryMs: (request['quote_expiry_ms'] as num?)?.toInt() ??
+          (payload['quote_expiry_ms'] as num?)?.toInt() ?? 0,
+      protocolFeePlancks: (request['protocol_fee'] as num?)?.toInt() ?? 0,
+      status: request['status']?.toString() ?? 'Pending',
+      createdAtMs: (request['created_at_ms'] as num?)?.toInt() ?? 0,
+      merchantPublicKey: payload['merchant_public_key']?.toString(),
+      qrPayload: json['qr_payload'] as Map<String, dynamic>?,
+    );
+  }
+}
+
+class MerchantReceipt {
+  MerchantReceipt({
+    required this.paymentId,
+    required this.merchantId,
+    required this.ghsPricePesewas,
+    required this.omniaAmountPlancks,
+    required this.exchangeRate,
+    required this.protocolFeePlancks,
+    required this.netOmniaPlancks,
+    required this.confirmedAtMs,
+    this.txReference,
+  });
+
+  final String paymentId;
+  final String merchantId;
+  final int ghsPricePesewas;
+  final int omniaAmountPlancks;
+  final int exchangeRate;
+  final int protocolFeePlancks;
+  final int netOmniaPlancks;
+  final int confirmedAtMs;
+  final String? txReference;
+
+  factory MerchantReceipt.fromJson(Map<String, dynamic> json) {
+    final receipt = (json['receipt'] as Map<String, dynamic>?) ?? json;
+    return MerchantReceipt(
+      paymentId: receipt['payment_id']?.toString() ?? '',
+      merchantId: receipt['merchant_id']?.toString() ?? '',
+      ghsPricePesewas: (receipt['ghs_price'] as num?)?.toInt() ?? 0,
+      omniaAmountPlancks: (receipt['omnia_amount'] as num?)?.toInt() ?? 0,
+      exchangeRate: (receipt['exchange_rate'] as num?)?.toInt() ?? 0,
+      protocolFeePlancks: (receipt['protocol_fee'] as num?)?.toInt() ?? 0,
+      netOmniaPlancks: (receipt['net_omnia'] as num?)?.toInt() ?? 0,
+      confirmedAtMs: (receipt['confirmed_at_ms'] as num?)?.toInt() ?? 0,
+      txReference: receipt['tx_reference']?.toString(),
+    );
+  }
+}

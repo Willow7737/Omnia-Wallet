@@ -331,25 +331,53 @@ class _Actions extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Space.lg),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: OmniaButton(
-              label: 'Send',
-              icon: Iconsax.arrow_up_3_copy,
-              expand: true,
-              onPressed: () => context.push('/send'),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: OmniaButton(
+                  label: 'Send',
+                  icon: Iconsax.arrow_up_3_copy,
+                  expand: true,
+                  onPressed: () => context.push('/send'),
+                ),
+              ),
+              const SizedBox(width: Space.md),
+              Expanded(
+                child: OmniaButton(
+                  label: 'Receive',
+                  icon: Iconsax.arrow_down_copy,
+                  expand: true,
+                  color: ButtonColor.secondary,
+                  onPressed: () => context.push('/receive'),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: Space.md),
-          Expanded(
-            child: OmniaButton(
-              label: 'Receive',
-              icon: Iconsax.arrow_down_copy,
-              expand: true,
-              color: ButtonColor.secondary,
-              onPressed: () => context.push('/receive'),
-            ),
+          const SizedBox(height: Space.sm),
+          Row(
+            children: [
+              Expanded(
+                child: OmniaButton(
+                  label: 'Buy OMNIA',
+                  icon: Iconsax.empty_wallet_copy,
+                  expand: true,
+                  color: ButtonColor.positiveTonal,
+                  onPressed: () => context.push('/buy-omnia'),
+                ),
+              ),
+              const SizedBox(width: Space.md),
+              Expanded(
+                child: OmniaButton(
+                  label: 'Pay merchant',
+                  icon: Iconsax.scan_barcode,
+                  expand: true,
+                  color: ButtonColor.secondary,
+                  onPressed: () => context.push('/pay-merchant'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
