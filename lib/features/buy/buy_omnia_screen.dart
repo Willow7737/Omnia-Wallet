@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 
-import '../../core/design/tokens.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';
@@ -212,7 +211,7 @@ class _BuyOmniaScreenState extends ConsumerState<BuyOmniaScreen> {
             ),
             const SizedBox(height: Space.md),
             DropdownButtonFormField<String>(
-              value: _provider,
+              initialValue: _provider,
               decoration: const InputDecoration(labelText: 'Provider'),
               items: const [
                 DropdownMenuItem(value: 'Mtn', child: Text('MTN Mobile Money')),

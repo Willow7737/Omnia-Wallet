@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:iconsax_flutter/iconsax_flutter.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
-import '../../core/design/tokens.dart';
 import '../../core/errors.dart';
 import '../../core/format.dart';
 import '../../core/theme.dart';

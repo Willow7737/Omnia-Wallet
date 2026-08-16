@@ -217,7 +217,7 @@ class _SendScreenState extends ConsumerState<SendScreen> {
     final auth = LocalAuthentication();
     try {
       if (!await auth.isDeviceSupported()) return true; // no hardware — allow
-      return auth.authenticate(
+      return await auth.authenticate(
         localizedReason:
             _isTransferable ? 'Confirm to send funds' : 'Confirm to send UBC',
         options: const AuthenticationOptions(stickyAuth: true),

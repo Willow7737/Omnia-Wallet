@@ -155,4 +155,39 @@ class _StubWallet implements WalletRepository {
     required int amount,
   }) =>
       throw UnimplementedError();
+
+  @override
+  Future<OmniaQuote> requestOmniaQuote({
+    required int ghsAmountPesewas,
+    required String provider,
+    required String customerNumber,
+  }) =>
+      throw UnimplementedError();
+
+  @override
+  Future<BuyOmniaResult> buyOmnia({
+    required String quoteId,
+    required String customerNumber,
+  }) =>
+      throw UnimplementedError();
+
+  @override
+  Future<PaymentOrderStatus> getPaymentOrderStatus({
+    required String orderId,
+  }) =>
+      throw UnimplementedError();
+
+  @override
+  Future<MerchantPaymentRequest> createMerchantPaymentRequest({
+    required String merchantId,
+    required int ghsPricePesewas,
+  }) =>
+      throw UnimplementedError();
+
+  @override
+  Future<MerchantReceipt> getMerchantReceipt({
+    required String merchantId,
+    required String paymentId,
+  }) =>
+      throw UnimplementedError();
 }
