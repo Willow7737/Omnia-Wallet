@@ -139,13 +139,18 @@ class _BuyOmniaScreenState extends ConsumerState<BuyOmniaScreen> {
   String _stateDescription(String state) => switch (state) {
         'CREATED' => 'Preparing your quote-backed order.',
         'QUOTED' => 'Quote accepted by the payment service.',
-        'PAYMENT_PENDING' => 'Complete the mobile-money authorization on your phone.',
+        'PAYMENT_PENDING' =>
+          'Complete the mobile-money authorization on your phone.',
         'PAYMENT_VERIFIED' => 'Mobile-money payment verified.',
         'RISK_REVIEW' || 'RISK_APPROVED' => 'Risk checks are being completed.',
-        'INVENTORY_RESERVED' => 'Treasury pilot inventory reserved for delivery.',
+        'INVENTORY_RESERVED' =>
+          'Treasury pilot inventory reserved for delivery.',
         'DELIVERED' => 'OMNIA delivered to your wallet.',
-        'PAYMENT_FAILED' || 'PAYMENT_TIMEOUT' => 'The mobile-money payment did not complete.',
-        'INVENTORY_UNAVAILABLE' => 'Pilot inventory is temporarily unavailable; follow the refund path.',
+        'PAYMENT_FAILED' ||
+        'PAYMENT_TIMEOUT' =>
+          'The mobile-money payment did not complete.',
+        'INVENTORY_UNAVAILABLE' =>
+          'Pilot inventory is temporarily unavailable; follow the refund path.',
         'REFUNDED' => 'The order was refunded.',
         _ => 'The node is processing this order.',
       };
@@ -161,7 +166,8 @@ class _BuyOmniaScreenState extends ConsumerState<BuyOmniaScreen> {
       body: SafeArea(
         top: false,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(Space.lg, Space.md, Space.lg, Space.x5l),
+          padding: const EdgeInsets.fromLTRB(
+              Space.lg, Space.md, Space.lg, Space.x5l),
           children: [
             Text(
               'Buy with Ghana mobile money',
@@ -174,12 +180,14 @@ class _BuyOmniaScreenState extends ConsumerState<BuyOmniaScreen> {
             const SizedBox(height: Space.xs),
             Text(
               'OMNIA is a floating transferable asset. Your quote is time-limited and uses treasury-funded pilot inventory; it is not a fixed GHS redemption promise.',
-              style: TextStyle(color: o.textMedium, height: LineHeights.relaxed),
+              style:
+                  TextStyle(color: o.textMedium, height: LineHeights.relaxed),
             ),
             const SizedBox(height: Space.xl),
             TextField(
               controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
                 labelText: 'Amount to spend (GHS)',
                 prefixText: 'GHS ',
@@ -211,10 +219,12 @@ class _BuyOmniaScreenState extends ConsumerState<BuyOmniaScreen> {
                 DropdownMenuItem(value: 'Telecel', child: Text('Telecel Cash')),
                 DropdownMenuItem(value: 'At', child: Text('AT Money')),
               ],
-              onChanged: _busy ? null : (value) => setState(() {
-                _provider = value ?? 'Mtn';
-                _quote = null;
-              }),
+              onChanged: _busy
+                  ? null
+                  : (value) => setState(() {
+                        _provider = value ?? 'Mtn';
+                        _quote = null;
+                      }),
             ),
             const SizedBox(height: Space.lg),
             OmniaButton.primary(
@@ -236,7 +246,8 @@ class _BuyOmniaScreenState extends ConsumerState<BuyOmniaScreen> {
             ],
             if (order != null) ...[
               const SizedBox(height: Space.xl),
-              _OrderCard(order: order, description: _stateDescription(order.state)),
+              _OrderCard(
+                  order: order, description: _stateDescription(order.state)),
             ],
             if (_error != null) ...[
               const SizedBox(height: Space.md),
@@ -268,25 +279,38 @@ class _QuoteCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Quote disclosure', style: TextStyle(color: o.textHigh, fontWeight: Weights.bold)),
+          Text('Quote disclosure',
+              style: TextStyle(color: o.textHigh, fontWeight: Weights.bold)),
           const SizedBox(height: Space.sm),
           Text(
             '${ghs(quote.totalGhsCostPesewas)} → ${Fmt.number(quote.netOmniaPlancks)} OMNIA net',
-            style: TextStyle(color: o.accent, fontSize: FontSizes.xxl, fontWeight: Weights.bold),
+            style: TextStyle(
+                color: o.accent,
+                fontSize: FontSizes.xxl,
+                fontWeight: Weights.bold),
           ),
           const SizedBox(height: Space.md),
           ...quote.disclosureFields.map((field) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: Space.xs),
                 child: Row(
                   children: [
-                    Expanded(child: Text(field.label, style: TextStyle(color: o.textMedium))),
-                    Flexible(child: Text(field.value, textAlign: TextAlign.right, style: TextStyle(color: o.textHigh, fontWeight: Weights.medium))),
+                    Expanded(
+                        child: Text(field.label,
+                            style: TextStyle(color: o.textMedium))),
+                    Flexible(
+                        child: Text(field.value,
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                                color: o.textHigh,
+                                fontWeight: Weights.medium))),
                   ],
                 ),
               )),
           const SizedBox(height: Space.sm),
-          Text('Quote ID: ${quote.quoteId}', style: TextStyle(color: o.textLow, fontSize: FontSizes.xs)),
-          Text('Provider: ${quote.provider}', style: TextStyle(color: o.textLow, fontSize: FontSizes.xs)),
+          Text('Quote ID: ${quote.quoteId}',
+              style: TextStyle(color: o.textLow, fontSize: FontSizes.xs)),
+          Text('Provider: ${quote.provider}',
+              style: TextStyle(color: o.textLow, fontSize: FontSizes.xs)),
         ],
       ),
     );
@@ -308,25 +332,35 @@ class _OrderCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: positive ? o.positive.withValues(alpha: 0.12) : o.bg50,
         borderRadius: Radii.rLg,
-        border: Border.all(color: positive ? o.positive.withValues(alpha: 0.35) : o.borderLow),
+        border: Border.all(
+            color: positive ? o.positive.withValues(alpha: 0.35) : o.borderLow),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(positive ? Iconsax.tick_circle : Iconsax.refresh, color: positive ? o.positive : o.accent),
+              Icon(positive ? Iconsax.tick_circle : Iconsax.refresh,
+                  color: positive ? o.positive : o.accent),
               const SizedBox(width: Space.sm),
-              Text(order.state, style: TextStyle(color: o.textHigh, fontWeight: Weights.bold)),
+              Text(order.state,
+                  style:
+                      TextStyle(color: o.textHigh, fontWeight: Weights.bold)),
             ],
           ),
           const SizedBox(height: Space.sm),
-          Text(description, style: TextStyle(color: o.textMedium, height: LineHeights.relaxed)),
+          Text(description,
+              style:
+                  TextStyle(color: o.textMedium, height: LineHeights.relaxed)),
           const SizedBox(height: Space.md),
-          Text('Order ${order.orderId}', style: TextStyle(color: o.textLow, fontSize: FontSizes.xs)),
+          Text('Order ${order.orderId}',
+              style: TextStyle(color: o.textLow, fontSize: FontSizes.xs)),
           if (order.isSuccessful) ...[
             const SizedBox(height: Space.sm),
-            Text('Receipt: ${Fmt.number(order.omniaQuantityPlancks)} OMNIA plancks allocated', style: TextStyle(color: o.positive, fontWeight: Weights.medium)),
+            Text(
+                'Receipt: ${Fmt.number(order.omniaQuantityPlancks)} OMNIA plancks allocated',
+                style:
+                    TextStyle(color: o.positive, fontWeight: Weights.medium)),
           ],
         ],
       ),
