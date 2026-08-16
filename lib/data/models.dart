@@ -280,7 +280,6 @@ class FinancialTransferResult {
       );
 }
 
-
 // ---------------------------------------------------------------------------
 // Ghana mobile-money acquisition and merchant settlement
 // ---------------------------------------------------------------------------
@@ -332,11 +331,9 @@ class OmniaQuote {
     return OmniaQuote(
       quoteId: quote['quote_id']?.toString() ?? '',
       ghsAmountPesewas: (quote['ghs_amount'] as num?)?.toInt() ?? 0,
-      omniaQuantityPlancks:
-          (quote['omnia_quantity'] as num?)?.toInt() ?? 0,
+      omniaQuantityPlancks: (quote['omnia_quantity'] as num?)?.toInt() ?? 0,
       exchangeRate: (quote['exchange_rate'] as num?)?.toInt() ?? 0,
-      providerFeePesewas:
-          (quote['provider_fee_ghs'] as num?)?.toInt() ?? 0,
+      providerFeePesewas: (quote['provider_fee_ghs'] as num?)?.toInt() ?? 0,
       omniaFeePlancks: (quote['omnia_fee'] as num?)?.toInt() ?? 0,
       spreadBps: (quote['spread_bps'] as num?)?.toInt() ?? 0,
       estimatedDeliverySeconds:
@@ -350,9 +347,8 @@ class OmniaQuote {
           .whereType<Map<String, dynamic>>()
           .map(QuoteDisclosure.fromJson)
           .toList(growable: false),
-      totalGhsCostPesewas:
-          (json['total_ghs_cost_pesewas'] as num?)?.toInt() ??
-              ((quote['ghs_amount'] as num?)?.toInt() ?? 0),
+      totalGhsCostPesewas: (json['total_ghs_cost_pesewas'] as num?)?.toInt() ??
+          ((quote['ghs_amount'] as num?)?.toInt() ?? 0),
       netOmniaPlancks: (json['net_omnia_plancks'] as num?)?.toInt() ??
           ((quote['omnia_quantity'] as num?)?.toInt() ?? 0),
     );
@@ -379,7 +375,8 @@ class QuoteDisclosure {
   final String label;
   final String value;
 
-  factory QuoteDisclosure.fromJson(Map<String, dynamic> json) => QuoteDisclosure(
+  factory QuoteDisclosure.fromJson(Map<String, dynamic> json) =>
+      QuoteDisclosure(
         label: json['label']?.toString() ?? '',
         value: json['value']?.toString() ?? '',
       );
@@ -450,20 +447,16 @@ class PaymentOrderStatus {
       state: order['state']?.toString() ?? 'UNKNOWN',
       customerRef: order['customer_ref']?.toString() ?? '',
       recipientRef: order['recipient_ref']?.toString() ?? '',
-      ghsAmountPesewas:
-          (order['ghs_amount_pesewas'] as num?)?.toInt() ?? 0,
-      ghsReceivedPesewas:
-          (order['ghs_received_pesewas'] as num?)?.toInt(),
+      ghsAmountPesewas: (order['ghs_amount_pesewas'] as num?)?.toInt() ?? 0,
+      ghsReceivedPesewas: (order['ghs_received_pesewas'] as num?)?.toInt(),
       omniaQuantityPlancks:
           (order['omnia_quantity_plancks'] as num?)?.toInt() ?? 0,
       exchangeRate: (order['exchange_rate'] as num?)?.toInt() ?? 0,
-      providerFeePesewas:
-          (order['provider_fee_pesewas'] as num?)?.toInt() ?? 0,
+      providerFeePesewas: (order['provider_fee_pesewas'] as num?)?.toInt() ?? 0,
       omniaFeePlancks: (order['omnia_fee_plancks'] as num?)?.toInt() ?? 0,
       providerName: order['provider_name']?.toString() ?? '',
       providerRef: order['provider_ref']?.toString(),
-      inventoryReservationRef:
-          order['inventory_reservation_ref']?.toString(),
+      inventoryReservationRef: order['inventory_reservation_ref']?.toString(),
       isTerminal: order['is_terminal'] as bool? ?? false,
       isEconomicallyDelivered:
           order['is_economically_delivered'] as bool? ?? false,
@@ -520,22 +513,28 @@ class MerchantPaymentRequest {
   final Map<String, dynamic>? qrPayload;
 
   factory MerchantPaymentRequest.fromJson(Map<String, dynamic> json) {
-    final request =
-        (json['payment_request'] as Map<String, dynamic>?) ?? json;
+    final request = (json['payment_request'] as Map<String, dynamic>?) ?? json;
     final payload = (json['qr_payload'] as Map<String, dynamic>?) ?? json;
     return MerchantPaymentRequest(
-      paymentId: request['payment_id']?.toString() ?? payload['payment_id']?.toString() ?? '',
-      merchantId: request['merchant_id']?.toString() ?? payload['merchant_id']?.toString() ?? '',
+      paymentId: request['payment_id']?.toString() ??
+          payload['payment_id']?.toString() ??
+          '',
+      merchantId: request['merchant_id']?.toString() ??
+          payload['merchant_id']?.toString() ??
+          '',
       customerWallet: request['customer_wallet']?.toString() ?? '',
       ghsPricePesewas: (request['ghs_price'] as num?)?.toInt() ??
           (request['ghs_price_pesewas'] as num?)?.toInt() ??
-          (payload['ghs_price_pesewas'] as num?)?.toInt() ?? 0,
+          (payload['ghs_price_pesewas'] as num?)?.toInt() ??
+          0,
       omniaAmountPlancks: (request['omnia_amount'] as num?)?.toInt() ??
           (request['omnia_amount_plancks'] as num?)?.toInt() ??
-          (payload['omnia_amount_plancks'] as num?)?.toInt() ?? 0,
+          (payload['omnia_amount_plancks'] as num?)?.toInt() ??
+          0,
       exchangeRate: (request['exchange_rate'] as num?)?.toInt() ?? 0,
       quoteExpiryMs: (request['quote_expiry_ms'] as num?)?.toInt() ??
-          (payload['quote_expiry_ms'] as num?)?.toInt() ?? 0,
+          (payload['quote_expiry_ms'] as num?)?.toInt() ??
+          0,
       protocolFeePlancks: (request['protocol_fee'] as num?)?.toInt() ?? 0,
       status: request['status']?.toString() ?? 'Pending',
       createdAtMs: (request['created_at_ms'] as num?)?.toInt() ?? 0,
