@@ -560,3 +560,12 @@ The wallet uses these authenticated endpoints:
 | `GET /api/v1/merchants/:id/receipt/:payment_id` | Read a confirmed merchant receipt. |
 
 The UI deliberately distinguishes **payment submitted** from **merchant confirmed**. Regulated production mobile-money credentials, provider webhooks, reconciliation, and operational merchant tooling remain deployment prerequisites; the sandbox provider and wallet screens are intended for controlled testnet and pilot validation.
+
+
+## Ghana-first OMNIA acquisition and merchant payments
+
+The wallet includes a **Buy OMNIA** flow for Ghana mobile money and a merchant QR payment flow. The wallet submits only the allowed purchase inputs, displays every signed quote disclosure, and uses the server's quote ID for initiation. It never chooses the exchange rate, fee, OMNIA quantity, treasury allocation, or payment-success state.
+
+The supported pilot provider identifiers are MTN, Telecel, and AT. The payment screen distinguishes `PENDING`, provider-confirmed payment, allocation, delivery, refund, cancellation, and manual-review outcomes. A wallet signature proves that the user authorized a transfer; it does not by itself prove merchant settlement or provider success.
+
+For production use, the node must be configured with `OMNIA_RUNTIME_MODE=production`, durable payment storage, real provider credentials, and an operated recovery/reconciliation service. The sandbox provider and in-memory store are for development and testnet use only. OMNIA remains a floating transferable asset with no fixed GHS redemption promise, while UBC remains a non-transferable participation allowance. See the protocol repository's [`production-readiness.md`](https://github.com/Willow7737/omnia-protocol/blob/dev/docs/financial/production-readiness.md) before enabling real customer funds.
