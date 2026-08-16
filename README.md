@@ -9,10 +9,12 @@
 The wallet holds an Ed25519 keypair **on the device** (never a shared secret), derives an Omnia DID from the public key, and authenticates to an Omnia node with a challenge/signature login — or via **Supabase sign-in** (Google/GitHub/email) with node JWTs minted by an edge function (dual-mode auth).
 
 **Shipped in v1**, live against the public testnet node. Note that this node
-is the public ingress of a **standing 3-node geo-distributed validator
-mesh** (Nuremberg / Ashburn / Singapore, 2 peers each), with **Lane 0
-finality working** — so the per-transaction finality badges do light up.
-Canonical Lane 1 height still reads 0 on a quiet network; see
+is the public ingress of a **standing 5-node geo-distributed validator
+mesh** (Nuremberg / Ashburn / Singapore / Helsinki / Falkenstein, 4 peers
+each), with **Lane 0 finality enabled** (`lane0_enabled: true`, quorum
+4-of-5) — that is what the per-transaction finality badges read. The mesh is
+currently idle, so until you transact the node's own Lane 0 counters and
+canonical Lane 1 height all read 0; see
 [`benchmark-gates.md`](https://github.com/Willow7737/omnia-protocol/blob/main/docs/reference/benchmark-gates.md)
 in the protocol repo for the measured numbers.
 
