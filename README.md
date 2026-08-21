@@ -234,7 +234,7 @@ flutter run --dart-define=OMNIA_NODE_URL=http://localhost:9090
 ### Building a Debug APK in GitHub Actions
 The repository includes a **Debug APK** workflow at [`.github/workflows/debug-apk.yml`](./.github/workflows/debug-apk.yml). It runs automatically when changes are pushed to `main`, and it can also be started manually from the repository's **Actions** tab by selecting **Debug APK** and choosing **Run workflow**. No signing keys or other secrets are required because the output is debug-signed for testing.
 
-After the workflow finishes, open the completed run, scroll to **Artifacts**, and download `omnia-wallet-debug-apk`. The archive contains `app-debug.apk`, which can be installed on an Android device for testing. This APK is not suitable for publishing to Google Play; use the release process below for a signed production bundle.
+After the workflow finishes, the APK is available both as the `omnia-wallet-debug-apk` workflow artifact and in the repository's [GitHub Releases](https://github.com/Willow7737/Omnia-Wallet/releases) under the prerelease **Omnia Wallet Debug APK** with the stable tag `debug-latest`. Download `app-debug.apk` directly from that release for installation on an Android device. The release asset is replaced automatically by the next successful build. This APK is not suitable for publishing to Google Play; use the release process below for a signed production bundle.
 
 ### Running a Node Locally
 

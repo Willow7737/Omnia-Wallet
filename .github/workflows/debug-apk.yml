@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-debug-apk:
@@ -37,10 +37,28 @@ jobs:
       - name: Build debug APK
         run: flutter build apk --debug
 
-      - name: Upload debug APK
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: omnia-wallet-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish debug APK to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_tag="debug-latest"
+          apk_path="build/app/outputs/flutter-apk/app-debug.apk"
+
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" "$apk_path" --clobber
+          else
+            gh release create "$release_tag" "$apk_path" \
+              --target "$GITHUB_SHA" \
+              --title "Omnia Wallet Debug APK" \
+              --notes "Latest debug APK built from commit $GITHUB_SHA. For testing only; this APK is not suitable for Google Play publication." \
+              --prerelease \
+              --latest=false
+          fi
