@@ -5,7 +5,7 @@
 // cannot take a value computed in a project script — and if they ever drift,
 // the force below would quietly pin plugin subprojects to a toolchain the app
 // itself no longer uses.
-val agpVersion = "8.9.1"
+val agpVersion = "8.11.1"
 val kotlinVersion = "2.1.10"
 
 allprojects {
@@ -26,7 +26,7 @@ allprojects {
     // declare their *own* Android Gradle Plugin and Kotlin versions:
     //
     //     buildscript {
-    //         dependencies { classpath 'com.android.tools.build:gradle:8.12.1' }
+    //         dependencies { classpath 'com.android.tools.build:gradle:8.11.1' }
     //     }
     //
     // Left alone, that makes Gradle download a second, complete AGP toolchain

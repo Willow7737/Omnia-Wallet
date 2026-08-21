@@ -22,11 +22,10 @@ pluginManagement {
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"
     // Pinned to the stable Android Gradle Plugin / Kotlin line. AGP 9.x is
-    // still experimental and its DSL breaks on many machines. 8.9.1 is the
-    // minimum required by supabase_flutter's androidx dependencies
-    // (androidx.browser 1.9.0 / androidx.core 1.17.0) and runs on the
+    // still experimental and its DSL breaks on many machines. 8.11.1 is
+    // required by the current Flutter stable toolchain and runs on the
     // Gradle 8.14.1 wrapper this project uses.
-    id("com.android.application") version "8.9.1" apply false
+    id("com.android.application") version "8.11.1" apply false
     id("org.jetbrains.kotlin.android") version "2.1.10" apply false
     // Firebase. Declared but not applied here — app/build.gradle.kts applies
     // it only when google-services.json is present, so a clone without
