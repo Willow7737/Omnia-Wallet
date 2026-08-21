@@ -231,6 +231,11 @@ flutter run --dart-define=OMNIA_NODE_URL=http://10.0.2.2:9090
 flutter run --dart-define=OMNIA_NODE_URL=http://localhost:9090
 ```
 
+### Building a Debug APK in GitHub Actions
+The repository includes a **Debug APK** workflow at [`.github/workflows/debug-apk.yml`](./.github/workflows/debug-apk.yml). It runs automatically when changes are pushed to `main`, and it can also be started manually from the repository's **Actions** tab by selecting **Debug APK** and choosing **Run workflow**. No signing keys or other secrets are required because the output is debug-signed for testing.
+
+After the workflow finishes, open the completed run, scroll to **Artifacts**, and download `omnia-wallet-debug-apk`. The archive contains `app-debug.apk`, which can be installed on an Android device for testing. This APK is not suitable for publishing to Google Play; use the release process below for a signed production bundle.
+
 ### Running a Node Locally
 
 From the `omnia-protocol` repository:
