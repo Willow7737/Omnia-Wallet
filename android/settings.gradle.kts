@@ -26,7 +26,7 @@ plugins {
     // required by the current Flutter stable toolchain and runs on the
     // Gradle 8.14.1 wrapper this project uses.
     id("com.android.application") version "8.11.1" apply false
-    id("org.jetbrains.kotlin.android") version "2.1.10" apply false
+    id("org.jetbrains.kotlin.android") version "2.2.20" apply false
     // Firebase. Declared but not applied here — app/build.gradle.kts applies
     // it only when google-services.json is present, so a clone without
     // Firebase credentials still builds.

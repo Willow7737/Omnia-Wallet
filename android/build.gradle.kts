@@ -6,7 +6,7 @@
 // the force below would quietly pin plugin subprojects to a toolchain the app
 // itself no longer uses.
 val agpVersion = "8.11.1"
-val kotlinVersion = "2.1.10"
+val kotlinVersion = "2.2.20"
 
 allprojects {
     repositories {
